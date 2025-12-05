@@ -1,0 +1,77 @@
+// Contract addresses - UPDATE THESE AFTER DEPLOYMENT
+export const PM_TOKEN_ADDRESS = "0x181108f76d9910569203b5d59eb14Bc31961a989";
+
+export const CONTRACT_ADDRESSES = {
+  // BSC Mainnet
+  56: {
+    PMToken: "0x181108f76d9910569203b5d59eb14Bc31961a989",
+    PMPresale: "0xE23E0Bf6a999Ed0a9B676c0fA57e2e0b670E6986", // Deploy and update
+    PMAirdrop: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMStaking: "0xf13F098EA32758c234C58e00aFeaFb790696787a", // Deploy and update
+    PMSwap: "0x0DE5d903a94fbd9DDdb36b1D07995Fe3D777C69c", // Deploy and update
+    PMTokenSender: "0xDF51425A2Cf93426B5dA40eCa66cB7a698028eBD", // Deploy and update
+    PMTokenLocker: "0xD91419A0937095D7780d5533ec186E39aeffDeCd", // Deploy and update
+    PMTokenClaim: "0x0000000000000000000000000000000000000000", // Deploy and update
+    // PancakeSwap V2 Router & Factory
+    PancakeRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    PancakeFactory: "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+    // Common tokens
+    WBNB: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    USDT: "0x55d398326f99059fF775485246999027B3197955",
+    USDC: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+  },
+  // BSC Testnet
+  97: {
+    PMToken: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMPresale: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMAirdrop: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMStaking: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMSwap: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMTokenSender: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMTokenLocker: "0x0000000000000000000000000000000000000000", // Deploy and update
+    // PancakeSwap V2 Router (Testnet)
+    PancakeRouter: "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+    // Common tokens (Testnet)
+    WBNB: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+    USDT: "0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684",
+    USDC: "0x64544969ed7EBf5f083679233325356EbE738930",
+  },
+} as const;
+
+export type ChainId = keyof typeof CONTRACT_ADDRESSES;
+
+export const getContractAddress = (chainId: ChainId, contract: keyof (typeof CONTRACT_ADDRESSES)[56]) => {
+  return CONTRACT_ADDRESSES[chainId]?.[contract];
+};
+
+// Token metadata for UI display
+export const TOKEN_METADATA = {
+  PM: {
+    name: "Perfect Money",
+    symbol: "PM",
+    decimals: 18,
+    address: PM_TOKEN_ADDRESS,
+    logo: "/pm-token-logo-new.png",
+  },
+  BNB: {
+    name: "BNB",
+    symbol: "BNB",
+    decimals: 18,
+    address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    logo: "/lovable-uploads/bnb-logo.png",
+  },
+  USDT: {
+    name: "Tether USD",
+    symbol: "USDT",
+    decimals: 18,
+    address: "0x55d398326f99059fF775485246999027B3197955",
+    logo: "/lovable-uploads/usdt-logo.png",
+  },
+  USDC: {
+    name: "USD Coin",
+    symbol: "USDC",
+    decimals: 18,
+    address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+    logo: "/lovable-uploads/usdc-logo.png",
+  },
+} as const;
