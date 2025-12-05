@@ -10,15 +10,25 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
-import { ArrowLeft, Gift, Clock, CheckCircle, ExternalLink, Trophy, Loader2, BarChart3, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Gift, Clock, CheckCircle, ExternalLink, Trophy, Loader2, BarChart3, AlertTriangle, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { FaFacebook, FaYoutube, FaTwitter, FaTelegram } from "react-icons/fa";
 import { SiTrustpilot, SiGoogle } from "react-icons/si";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatUnits, parseEther } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi';
+import { formatUnits, parseEther, formatEther } from 'viem';
 import { PMAirdropABI } from "@/contracts/swapABI";
 import { CONTRACT_ADDRESSES } from "@/contracts/addresses";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PMAIRDROP_ADDRESS = CONTRACT_ADDRESSES[56].PMAirdrop as `0x${string}`;
 const CLAIM_FEE_USD = 0.01; // Fee in USD for each claim
@@ -27,6 +37,14 @@ const AirdropPage = () => {
   const { address, isConnected } = useAccount();
   const [walletAddress, setWalletAddress] = useState("");
   const [bnbPrice, setBnbPrice] = useState<number>(600); // Default fallback price
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingTask, setPendingTask] = useState<{ id: number; link: string; title: string } | null>(null);
+
+  // Get user's BNB balance
+  const { data: bnbBalance, refetch: refetchBalance } = useBalance({
+    address: address,
+    chainId: 56,
+  });
 
   // Fetch BNB price
   useEffect(() => {
@@ -46,8 +64,9 @@ const AirdropPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate BNB amount for $0.01 fee
+  // Calculate BNB amount for $0.01 fee (fallback)
   const claimFeeBnb = CLAIM_FEE_USD / bnbPrice;
+  const userBnbBalance = bnbBalance ? parseFloat(formatEther(bnbBalance.value)) : 0;
 
   // Check if contract is deployed
   const isContractDeployed = PMAIRDROP_ADDRESS !== "0x0000000000000000000000000000000000000000";
@@ -100,6 +119,20 @@ const AirdropPage = () => {
     chainId: 56,
     query: { enabled: isContractDeployed }
   });
+
+  // Get claim fee info from contract
+  const { data: claimFeeInfo } = useReadContract({
+    address: PMAIRDROP_ADDRESS,
+    abi: PMAirdropABI,
+    functionName: 'getClaimFeeInfo',
+    chainId: 56,
+    query: { enabled: isContractDeployed }
+  });
+
+  // Use contract fee if available, otherwise use calculated fee
+  const contractFeeBnb = claimFeeInfo ? Number(formatUnits((claimFeeInfo as any)[1] as bigint, 18)) : null;
+  const effectiveClaimFeeBnb = contractFeeBnb ?? claimFeeBnb;
+  const hasEnoughBnb = userBnbBalance >= effectiveClaimFeeBnb;
 
   // User-specific data
   const { data: hasClaimed, refetch: refetchHasClaimed } = useReadContract({
@@ -232,7 +265,7 @@ const AirdropPage = () => {
     }
   }, [completedTaskIds]);
 
-  // Handle task claim on contract
+  // Handle task claim on contract - show confirmation dialog first
   const handleTaskClaim = async (taskId: number, link: string) => {
     // First open the link
     window.open(link, "_blank");
@@ -254,22 +287,42 @@ const AirdropPage = () => {
       return;
     }
 
+    // Find task title for dialog
+    const task = tasks.find(t => t.id === taskId);
+    setPendingTask({ id: taskId, link, title: task?.title || `Task ${taskId}` });
+    setConfirmDialogOpen(true);
+  };
+
+  // Execute the actual claim after confirmation
+  const executeTaskClaim = async () => {
+    if (!pendingTask) return;
+    
+    if (!hasEnoughBnb) {
+      toast.error(`Insufficient BNB balance. You need at least ${effectiveClaimFeeBnb.toFixed(6)} BNB`);
+      setConfirmDialogOpen(false);
+      setPendingTask(null);
+      return;
+    }
+
     try {
       // Calculate fee: $0.01 worth of BNB
-      const feeInBnb = parseEther(claimFeeBnb.toFixed(18));
+      const feeInBnb = parseEther(effectiveClaimFeeBnb.toFixed(18));
       
       writeContract({
         address: PMAIRDROP_ADDRESS,
         abi: PMAirdropABI,
         functionName: 'claimTask',
-        args: [BigInt(taskId)],
+        args: [BigInt(pendingTask.id)],
         value: feeInBnb,
       } as any);
       
-      toast.info(`Claiming task with $${CLAIM_FEE_USD} fee (~${claimFeeBnb.toFixed(6)} BNB)`);
+      toast.info(`Claiming task with $${CLAIM_FEE_USD} fee (~${effectiveClaimFeeBnb.toFixed(6)} BNB)`);
     } catch (error: any) {
       toast.error(error?.message || "Failed to claim task reward");
     }
+    
+    setConfirmDialogOpen(false);
+    setPendingTask(null);
   };
 
   // Handle transaction confirmation
@@ -277,6 +330,7 @@ const AirdropPage = () => {
     if (isConfirmed && txHash) {
       refetchUserTasks();
       refetchHasClaimed();
+      refetchBalance();
       toast.success(`Task reward claimed! +${taskReward} PM`);
       window.dispatchEvent(new Event("balanceUpdate"));
     }
@@ -323,7 +377,7 @@ const AirdropPage = () => {
         </Link>
 
         {/* Stats Card */}
-        <Card className="p-4 mb-6 bg-gradient-to-br from-primary/10 to-secondary/10 backdrop-blur-sm border-primary/30">
+        <Card className="p-4 mb-4 bg-gradient-to-br from-primary/10 to-secondary/10 backdrop-blur-sm border-primary/30">
           <div className="flex items-center gap-2 mb-3">
             <BarChart3 className="h-5 w-5 text-primary" />
             <h3 className="font-bold">Airdrop Statistics</h3>
@@ -360,6 +414,30 @@ const AirdropPage = () => {
             </div>
           </div>
         </Card>
+
+        {/* BNB Balance Card */}
+        {isConnected && (
+          <Card className={`p-4 mb-6 backdrop-blur-sm border ${hasEnoughBnb ? 'bg-green-500/5 border-green-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Wallet className={`h-5 w-5 ${hasEnoughBnb ? 'text-green-500' : 'text-red-500'}`} />
+                <div>
+                  <p className="text-sm font-medium">Your BNB Balance</p>
+                  <p className={`text-lg font-bold ${hasEnoughBnb ? 'text-green-500' : 'text-red-500'}`}>
+                    {userBnbBalance.toFixed(6)} BNB
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Claim Fee</p>
+                <p className="text-sm font-medium">${CLAIM_FEE_USD} (~{effectiveClaimFeeBnb.toFixed(6)} BNB)</p>
+                {!hasEnoughBnb && (
+                  <p className="text-xs text-red-400 mt-1">Insufficient balance</p>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
 
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Airdrop Header with Timer */}
@@ -434,7 +512,7 @@ const AirdropPage = () => {
               <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                 <p className="text-xs text-yellow-400 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <span>Each claim requires a small fee of <strong>${CLAIM_FEE_USD}</strong> (~{claimFeeBnb.toFixed(6)} BNB)</span>
+                  <span>Each claim requires a small fee of <strong>${CLAIM_FEE_USD}</strong> (~{effectiveClaimFeeBnb.toFixed(6)} BNB)</span>
                 </p>
               </div>
               
@@ -565,6 +643,66 @@ const AirdropPage = () => {
 
       <Footer />
       <MobileBottomNav />
+
+      {/* Claim Confirmation Dialog */}
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Task Claim</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>You are about to claim the reward for:</p>
+              <p className="font-semibold text-foreground">{pendingTask?.title}</p>
+              
+              <div className="p-3 bg-muted rounded-lg space-y-2 mt-4">
+                <div className="flex justify-between text-sm">
+                  <span>Claim Fee:</span>
+                  <span className="font-medium">${CLAIM_FEE_USD} USD</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Fee in BNB:</span>
+                  <span className="font-medium">{effectiveClaimFeeBnb.toFixed(6)} BNB</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Your Balance:</span>
+                  <span className={`font-medium ${hasEnoughBnb ? 'text-green-500' : 'text-red-500'}`}>
+                    {userBnbBalance.toFixed(6)} BNB
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span>Reward:</span>
+                  <span className="font-bold text-primary">+{taskReward} PM</span>
+                </div>
+              </div>
+
+              {!hasEnoughBnb && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p className="text-sm text-red-400 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Insufficient BNB balance to pay the claim fee
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={executeTaskClaim}
+              disabled={!hasEnoughBnb || isPending}
+              className={!hasEnoughBnb ? 'opacity-50 cursor-not-allowed' : ''}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                'Confirm & Claim'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

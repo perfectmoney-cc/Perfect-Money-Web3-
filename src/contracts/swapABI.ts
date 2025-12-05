@@ -283,10 +283,26 @@ export const PMAirdropABI = [
   { inputs: [], name: "isActive", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "totalTasks", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "owner", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "claimFeeUSD", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "totalFeesCollected", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "feeCollector", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "hasClaimed", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "claimedAmount", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }, { name: "taskId", type: "uint256" }], name: "taskCompleted", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "taskId", type: "uint256" }], name: "taskRewards", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "getBNBPrice", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "getClaimFeeInBNB", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  {
+    inputs: [],
+    name: "getClaimFeeInfo",
+    outputs: [
+      { name: "feeUSD", type: "uint256" },
+      { name: "feeBNB", type: "uint256" },
+      { name: "bnbPrice", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
   {
     inputs: [{ name: "user", type: "address" }],
     name: "getUserTasks",
@@ -294,9 +310,36 @@ export const PMAirdropABI = [
     stateMutability: "view",
     type: "function"
   },
+  {
+    inputs: [],
+    name: "getAirdropInfo",
+    outputs: [
+      { name: "_airdropAmount", type: "uint256" },
+      { name: "_totalClaimed", type: "uint256" },
+      { name: "_maxClaimable", type: "uint256" },
+      { name: "_startTime", type: "uint256" },
+      { name: "_endTime", type: "uint256" },
+      { name: "_isActive", type: "bool" },
+      { name: "_claimFeeUSD", type: "uint256" },
+      { name: "_totalFeesCollected", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "_user", type: "address" }],
+    name: "getUserInfo",
+    outputs: [
+      { name: "_hasClaimed", type: "bool" },
+      { name: "_claimedAmount", type: "uint256" },
+      { name: "_completedTasks", type: "uint256[]" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
   // Write functions
   {
-    inputs: [{ name: "amount", type: "uint256" }, { name: "proof", type: "bytes32[]" }],
+    inputs: [{ name: "proof", type: "bytes32[]" }],
     name: "claim",
     outputs: [],
     stateMutability: "nonpayable",
@@ -306,12 +349,14 @@ export const PMAirdropABI = [
     inputs: [{ name: "taskId", type: "uint256" }],
     name: "claimTask",
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     type: "function"
   },
   // Events
   { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "AirdropClaimed", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: false, name: "taskId", type: "uint256" }, { indexed: false, name: "reward", type: "uint256" }], name: "TaskCompleted", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: false, name: "taskId", type: "uint256" }, { indexed: false, name: "reward", type: "uint256" }, { indexed: false, name: "feePaid", type: "uint256" }], name: "TaskCompleted", type: "event" },
+  { anonymous: false, inputs: [{ indexed: false, name: "newFeeUSD", type: "uint256" }], name: "ClaimFeeUpdated", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "to", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "FeesWithdrawn", type: "event" },
 ] as const;
 
 // PancakeSwap Pair ABI for liquidity info
