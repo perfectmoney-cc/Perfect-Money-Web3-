@@ -38,6 +38,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import APIIntegration from "./pages/APIIntegration";
 import AirdropPage from "./pages/dashboard/Airdrop";
+import AirdropAdminPage from "./pages/dashboard/AirdropAdmin";
 import SwapPage from "./pages/dashboard/Swap";
 import TokenSecurityPage from "./pages/dashboard/TokenSecurity";
 import CommunityPage from "./pages/dashboard/Community";
@@ -89,6 +90,7 @@ const App = () => (
               <Route path="/dashboard/merchant/links" element={<MerchantLinks />} />
               <Route path="/dashboard/payment" element={<PaymentDetails />} />
               <Route path="/dashboard/airdrop" element={<AirdropPage />} />
+              <Route path="/dashboard/airdrop/admin" element={<AirdropAdminPage />} />
               <Route path="/dashboard/swap" element={<SwapPage />} />
               <Route path="/dashboard/token-security" element={<TokenSecurityPage />} />
               <Route path="/dashboard/community" element={<CommunityPage />} />

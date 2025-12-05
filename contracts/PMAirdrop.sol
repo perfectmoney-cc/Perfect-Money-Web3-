@@ -46,7 +46,7 @@ abstract contract Ownable {
 /**
  * @title PM Token Airdrop Contract
  * @notice Handles PM token airdrops with merkle proof verification and task-based claims
- * @dev Each task claim requires a small BNB fee (default $0.01 USD)
+ * @dev Each task claim requires a claim fee + network fee (both configurable, default $0.01 USD each)
  */
 contract PMAirdrop is Ownable {
     IERC20 public pmToken;
@@ -61,9 +61,11 @@ contract PMAirdrop is Ownable {
     uint256 public endTime;
     bool public isActive;
     
-    // Claim fee in USD (with 8 decimals to match Chainlink)
+    // Fee configuration (with 8 decimals to match Chainlink)
     uint256 public claimFeeUSD = 1000000; // $0.01 with 8 decimals
+    uint256 public networkFeeUSD = 1000000; // $0.01 with 8 decimals (minimum network/gas fee)
     uint256 public totalFeesCollected;
+    uint256 public totalNetworkFeesCollected;
     address public feeCollector;
     
     mapping(address => bool) public hasClaimed;
@@ -74,13 +76,22 @@ contract PMAirdrop is Ownable {
     mapping(uint256 => uint256) public taskRewards;
     uint256 public totalTasks;
     
+    // Task metadata
+    mapping(uint256 => string) public taskNames;
+    mapping(uint256 => string) public taskLinks;
+    mapping(uint256 => bool) public taskEnabled;
+    
     event AirdropClaimed(address indexed user, uint256 amount);
-    event TaskCompleted(address indexed user, uint256 taskId, uint256 reward, uint256 feePaid);
+    event TaskCompleted(address indexed user, uint256 taskId, uint256 reward, uint256 claimFeePaid, uint256 networkFeePaid);
     event MerkleRootUpdated(bytes32 newRoot);
     event AirdropStarted(uint256 startTime, uint256 endTime);
     event ClaimFeeUpdated(uint256 newFeeUSD);
-    event FeesWithdrawn(address indexed to, uint256 amount);
+    event NetworkFeeUpdated(uint256 newFeeUSD);
+    event FeesWithdrawn(address indexed to, uint256 claimFees, uint256 networkFees);
     event FeeCollectorUpdated(address indexed newCollector);
+    event TaskConfigured(uint256 indexed taskId, string name, string link, uint256 reward, bool enabled);
+    event AirdropAmountUpdated(uint256 newAmount);
+    event MaxClaimableUpdated(uint256 newMaxClaimable);
     
     constructor(address _pmToken, uint256 _airdropAmount, address _priceFeed) {
         pmToken = IERC20(_pmToken);
@@ -105,27 +116,99 @@ contract PMAirdrop is Ownable {
      * @return feeInBNB The fee amount in wei
      */
     function getClaimFeeInBNB() public view returns (uint256) {
-        uint256 bnbPrice = getBNBPrice(); // Price with 8 decimals
-        // claimFeeUSD has 8 decimals, bnbPrice has 8 decimals
-        // Result: (claimFeeUSD * 1e18) / bnbPrice = wei
+        uint256 bnbPrice = getBNBPrice();
         return (claimFeeUSD * 1e18) / bnbPrice;
     }
     
     /**
-     * @notice Get claim fee information
-     * @return feeUSD Fee in USD with 8 decimals
-     * @return feeBNB Fee in BNB (wei)
+     * @notice Calculate the network fee in BNB based on current BNB/USD price
+     * @return feeInBNB The network fee amount in wei
+     */
+    function getNetworkFeeInBNB() public view returns (uint256) {
+        uint256 bnbPrice = getBNBPrice();
+        return (networkFeeUSD * 1e18) / bnbPrice;
+    }
+    
+    /**
+     * @notice Calculate the total fee (claim + network) in BNB
+     * @return totalFeeInBNB The total fee amount in wei
+     */
+    function getTotalFeeInBNB() public view returns (uint256) {
+        return getClaimFeeInBNB() + getNetworkFeeInBNB();
+    }
+    
+    /**
+     * @notice Get comprehensive fee information
+     * @return claimFee Claim fee in USD with 8 decimals
+     * @return networkFee Network fee in USD with 8 decimals
+     * @return totalFeeUSD Total fee in USD with 8 decimals
+     * @return claimFeeBNB Claim fee in BNB (wei)
+     * @return networkFeeBNB Network fee in BNB (wei)
+     * @return totalFeeBNB Total fee in BNB (wei)
      * @return bnbPrice Current BNB price in USD with 8 decimals
      */
-    function getClaimFeeInfo() external view returns (
-        uint256 feeUSD,
-        uint256 feeBNB,
+    function getFeeInfo() external view returns (
+        uint256 claimFee,
+        uint256 networkFee,
+        uint256 totalFeeUSD,
+        uint256 claimFeeBNB,
+        uint256 networkFeeBNB,
+        uint256 totalFeeBNB,
         uint256 bnbPrice
     ) {
         bnbPrice = getBNBPrice();
-        feeBNB = getClaimFeeInBNB();
-        return (claimFeeUSD, feeBNB, bnbPrice);
+        claimFeeBNB = getClaimFeeInBNB();
+        networkFeeBNB = getNetworkFeeInBNB();
+        totalFeeBNB = claimFeeBNB + networkFeeBNB;
+        return (claimFeeUSD, networkFeeUSD, claimFeeUSD + networkFeeUSD, claimFeeBNB, networkFeeBNB, totalFeeBNB, bnbPrice);
     }
+    
+    /**
+     * @notice Get task information
+     * @param _taskId The task ID
+     * @return name Task name
+     * @return link Task link
+     * @return reward Task reward in tokens
+     * @return enabled Whether task is enabled
+     */
+    function getTaskInfo(uint256 _taskId) external view returns (
+        string memory name,
+        string memory link,
+        uint256 reward,
+        bool enabled
+    ) {
+        return (taskNames[_taskId], taskLinks[_taskId], taskRewards[_taskId], taskEnabled[_taskId]);
+    }
+    
+    /**
+     * @notice Get all tasks information
+     * @return names Array of task names
+     * @return links Array of task links
+     * @return rewards Array of task rewards
+     * @return enabledList Array of enabled status
+     */
+    function getAllTasks() external view returns (
+        string[] memory names,
+        string[] memory links,
+        uint256[] memory rewards,
+        bool[] memory enabledList
+    ) {
+        names = new string[](totalTasks);
+        links = new string[](totalTasks);
+        rewards = new uint256[](totalTasks);
+        enabledList = new bool[](totalTasks);
+        
+        for (uint256 i = 0; i < totalTasks; i++) {
+            names[i] = taskNames[i];
+            links[i] = taskLinks[i];
+            rewards[i] = taskRewards[i];
+            enabledList[i] = taskEnabled[i];
+        }
+        
+        return (names, links, rewards, enabledList);
+    }
+    
+    // ============ Admin Functions ============
     
     function startAirdrop(uint256 _duration, uint256 _maxClaimable) external onlyOwner {
         require(!isActive, "Airdrop already active");
@@ -140,6 +223,11 @@ contract PMAirdrop is Ownable {
         isActive = false;
     }
     
+    function resumeAirdrop() external onlyOwner {
+        require(block.timestamp <= endTime, "Airdrop period ended");
+        isActive = true;
+    }
+    
     function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
         merkleRoot = _merkleRoot;
         emit MerkleRootUpdated(_merkleRoot);
@@ -148,6 +236,12 @@ contract PMAirdrop is Ownable {
     function setClaimFeeUSD(uint256 _feeUSD) external onlyOwner {
         claimFeeUSD = _feeUSD;
         emit ClaimFeeUpdated(_feeUSD);
+    }
+    
+    function setNetworkFeeUSD(uint256 _feeUSD) external onlyOwner {
+        require(_feeUSD >= 1000000, "Network fee must be at least $0.01");
+        networkFeeUSD = _feeUSD;
+        emit NetworkFeeUpdated(_feeUSD);
     }
     
     function setFeeCollector(address _collector) external onlyOwner {
@@ -160,12 +254,94 @@ contract PMAirdrop is Ownable {
         priceFeed = AggregatorV3Interface(_priceFeed);
     }
     
+    function setAirdropAmount(uint256 _amount) external onlyOwner {
+        airdropAmount = _amount;
+        emit AirdropAmountUpdated(_amount);
+    }
+    
+    function setMaxClaimable(uint256 _maxClaimable) external onlyOwner {
+        maxClaimable = _maxClaimable;
+        emit MaxClaimableUpdated(_maxClaimable);
+    }
+    
+    /**
+     * @notice Configure a task with all parameters
+     * @param _taskId Task ID
+     * @param _name Task name/title
+     * @param _link Task link URL
+     * @param _reward Reward amount in tokens (with decimals)
+     * @param _enabled Whether task is enabled
+     */
+    function configureTask(
+        uint256 _taskId,
+        string calldata _name,
+        string calldata _link,
+        uint256 _reward,
+        bool _enabled
+    ) external onlyOwner {
+        taskNames[_taskId] = _name;
+        taskLinks[_taskId] = _link;
+        taskRewards[_taskId] = _reward;
+        taskEnabled[_taskId] = _enabled;
+        
+        if (_taskId >= totalTasks) {
+            totalTasks = _taskId + 1;
+        }
+        
+        emit TaskConfigured(_taskId, _name, _link, _reward, _enabled);
+    }
+    
+    /**
+     * @notice Set only task reward (legacy support)
+     */
     function setTaskReward(uint256 _taskId, uint256 _reward) external onlyOwner {
         taskRewards[_taskId] = _reward;
         if (_taskId >= totalTasks) {
             totalTasks = _taskId + 1;
         }
     }
+    
+    /**
+     * @notice Enable or disable a task
+     */
+    function setTaskEnabled(uint256 _taskId, bool _enabled) external onlyOwner {
+        taskEnabled[_taskId] = _enabled;
+    }
+    
+    /**
+     * @notice Batch configure multiple tasks
+     */
+    function batchConfigureTasks(
+        uint256[] calldata _taskIds,
+        string[] calldata _names,
+        string[] calldata _links,
+        uint256[] calldata _rewards,
+        bool[] calldata _enabledList
+    ) external onlyOwner {
+        require(
+            _taskIds.length == _names.length &&
+            _taskIds.length == _links.length &&
+            _taskIds.length == _rewards.length &&
+            _taskIds.length == _enabledList.length,
+            "Array length mismatch"
+        );
+        
+        for (uint256 i = 0; i < _taskIds.length; i++) {
+            uint256 taskId = _taskIds[i];
+            taskNames[taskId] = _names[i];
+            taskLinks[taskId] = _links[i];
+            taskRewards[taskId] = _rewards[i];
+            taskEnabled[taskId] = _enabledList[i];
+            
+            if (taskId >= totalTasks) {
+                totalTasks = taskId + 1;
+            }
+            
+            emit TaskConfigured(taskId, _names[i], _links[i], _rewards[i], _enabledList[i]);
+        }
+    }
+    
+    // ============ Claim Functions ============
     
     function claim(bytes32[] calldata _merkleProof) external {
         require(isActive, "Airdrop not active");
@@ -189,16 +365,19 @@ contract PMAirdrop is Ownable {
     /**
      * @notice Claim reward for completing a task
      * @param _taskId The ID of the completed task
-     * @dev Requires payment of claim fee in BNB
+     * @dev Requires payment of total fee (claim fee + network fee) in BNB
      */
     function claimTask(uint256 _taskId) external payable {
         require(isActive, "Airdrop not active");
         require(!taskCompleted[msg.sender][_taskId], "Task already completed");
         require(taskRewards[_taskId] > 0, "Invalid task");
+        require(taskEnabled[_taskId], "Task not enabled");
         
-        // Check fee payment
-        uint256 requiredFee = getClaimFeeInBNB();
-        require(msg.value >= requiredFee, "Insufficient fee");
+        // Check total fee payment (claim fee + network fee)
+        uint256 requiredClaimFee = getClaimFeeInBNB();
+        uint256 requiredNetworkFee = getNetworkFeeInBNB();
+        uint256 totalRequiredFee = requiredClaimFee + requiredNetworkFee;
+        require(msg.value >= totalRequiredFee, "Insufficient fee");
         
         uint256 reward = taskRewards[_taskId];
         require(totalClaimed + reward <= maxClaimable, "Max claimable reached");
@@ -206,16 +385,17 @@ contract PMAirdrop is Ownable {
         taskCompleted[msg.sender][_taskId] = true;
         claimedAmount[msg.sender] += reward;
         totalClaimed += reward;
-        totalFeesCollected += msg.value;
+        totalFeesCollected += requiredClaimFee;
+        totalNetworkFeesCollected += requiredNetworkFee;
         
         require(pmToken.transfer(msg.sender, reward), "Transfer failed");
         
         // Refund excess BNB if any
-        if (msg.value > requiredFee) {
-            payable(msg.sender).transfer(msg.value - requiredFee);
+        if (msg.value > totalRequiredFee) {
+            payable(msg.sender).transfer(msg.value - totalRequiredFee);
         }
         
-        emit TaskCompleted(msg.sender, _taskId, reward, msg.value);
+        emit TaskCompleted(msg.sender, _taskId, reward, requiredClaimFee, requiredNetworkFee);
     }
     
     function verify(
@@ -235,6 +415,8 @@ contract PMAirdrop is Ownable {
         return computedHash == root;
     }
     
+    // ============ Withdrawal Functions ============
+    
     function withdrawTokens(uint256 _amount) external onlyOwner {
         require(pmToken.transfer(owner(), _amount), "Transfer failed");
     }
@@ -242,9 +424,15 @@ contract PMAirdrop is Ownable {
     function withdrawFees() external onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No fees to withdraw");
+        uint256 claimFees = totalFeesCollected;
+        uint256 networkFees = totalNetworkFeesCollected;
+        totalFeesCollected = 0;
+        totalNetworkFeesCollected = 0;
         payable(feeCollector).transfer(balance);
-        emit FeesWithdrawn(feeCollector, balance);
+        emit FeesWithdrawn(feeCollector, claimFees, networkFees);
     }
+    
+    // ============ View Functions ============
     
     function getAirdropInfo() external view returns (
         uint256 _airdropAmount,
@@ -254,9 +442,22 @@ contract PMAirdrop is Ownable {
         uint256 _endTime,
         bool _isActive,
         uint256 _claimFeeUSD,
-        uint256 _totalFeesCollected
+        uint256 _networkFeeUSD,
+        uint256 _totalFeesCollected,
+        uint256 _totalNetworkFeesCollected
     ) {
-        return (airdropAmount, totalClaimed, maxClaimable, startTime, endTime, isActive, claimFeeUSD, totalFeesCollected);
+        return (
+            airdropAmount,
+            totalClaimed,
+            maxClaimable,
+            startTime,
+            endTime,
+            isActive,
+            claimFeeUSD,
+            networkFeeUSD,
+            totalFeesCollected,
+            totalNetworkFeesCollected
+        );
     }
     
     function getUserInfo(address _user) external view returns (
@@ -281,11 +482,6 @@ contract PMAirdrop is Ownable {
         return (hasClaimed[_user], claimedAmount[_user], result);
     }
     
-    /**
-     * @notice Get user's completed tasks as array
-     * @param _user User address
-     * @return Array of completed task IDs
-     */
     function getUserTasks(address _user) external view returns (uint256[] memory) {
         uint256[] memory completed = new uint256[](totalTasks);
         uint256 count = 0;
@@ -302,6 +498,19 @@ contract PMAirdrop is Ownable {
         }
         
         return result;
+    }
+    
+    /**
+     * @notice Get admin/owner info
+     */
+    function getAdminInfo() external view returns (
+        address _owner,
+        address _feeCollector,
+        address _priceFeed,
+        address _pmToken,
+        uint256 _contractBalance
+    ) {
+        return (owner(), feeCollector, address(priceFeed), address(pmToken), address(this).balance);
     }
     
     // Allow contract to receive BNB
