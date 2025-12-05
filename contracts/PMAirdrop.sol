@@ -7,6 +7,17 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
+interface AggregatorV3Interface {
+    function latestRoundData() external view returns (
+        uint80 roundId,
+        int256 answer,
+        uint256 startedAt,
+        uint256 updatedAt,
+        uint80 answeredInRound
+    );
+    function decimals() external view returns (uint8);
+}
+
 abstract contract Ownable {
     address private _owner;
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -34,10 +45,12 @@ abstract contract Ownable {
 
 /**
  * @title PM Token Airdrop Contract
- * @notice Handles PM token airdrops with merkle proof verification
+ * @notice Handles PM token airdrops with merkle proof verification and task-based claims
+ * @dev Each task claim requires a small BNB fee (default $0.01 USD)
  */
 contract PMAirdrop is Ownable {
     IERC20 public pmToken;
+    AggregatorV3Interface public priceFeed;
     
     bytes32 public merkleRoot;
     uint256 public airdropAmount;
@@ -48,6 +61,11 @@ contract PMAirdrop is Ownable {
     uint256 public endTime;
     bool public isActive;
     
+    // Claim fee in USD (with 8 decimals to match Chainlink)
+    uint256 public claimFeeUSD = 1000000; // $0.01 with 8 decimals
+    uint256 public totalFeesCollected;
+    address public feeCollector;
+    
     mapping(address => bool) public hasClaimed;
     mapping(address => uint256) public claimedAmount;
     
@@ -57,14 +75,56 @@ contract PMAirdrop is Ownable {
     uint256 public totalTasks;
     
     event AirdropClaimed(address indexed user, uint256 amount);
-    event TaskCompleted(address indexed user, uint256 taskId, uint256 reward);
+    event TaskCompleted(address indexed user, uint256 taskId, uint256 reward, uint256 feePaid);
     event MerkleRootUpdated(bytes32 newRoot);
     event AirdropStarted(uint256 startTime, uint256 endTime);
+    event ClaimFeeUpdated(uint256 newFeeUSD);
+    event FeesWithdrawn(address indexed to, uint256 amount);
+    event FeeCollectorUpdated(address indexed newCollector);
     
-    constructor(address _pmToken, uint256 _airdropAmount) {
+    constructor(address _pmToken, uint256 _airdropAmount, address _priceFeed) {
         pmToken = IERC20(_pmToken);
         airdropAmount = _airdropAmount;
+        priceFeed = AggregatorV3Interface(_priceFeed);
+        feeCollector = msg.sender;
         isActive = false;
+    }
+    
+    /**
+     * @notice Get the current BNB price in USD from Chainlink
+     * @return price BNB price with 8 decimals
+     */
+    function getBNBPrice() public view returns (uint256) {
+        (, int256 price, , , ) = priceFeed.latestRoundData();
+        require(price > 0, "Invalid price");
+        return uint256(price);
+    }
+    
+    /**
+     * @notice Calculate the claim fee in BNB based on current BNB/USD price
+     * @return feeInBNB The fee amount in wei
+     */
+    function getClaimFeeInBNB() public view returns (uint256) {
+        uint256 bnbPrice = getBNBPrice(); // Price with 8 decimals
+        // claimFeeUSD has 8 decimals, bnbPrice has 8 decimals
+        // Result: (claimFeeUSD * 1e18) / bnbPrice = wei
+        return (claimFeeUSD * 1e18) / bnbPrice;
+    }
+    
+    /**
+     * @notice Get claim fee information
+     * @return feeUSD Fee in USD with 8 decimals
+     * @return feeBNB Fee in BNB (wei)
+     * @return bnbPrice Current BNB price in USD with 8 decimals
+     */
+    function getClaimFeeInfo() external view returns (
+        uint256 feeUSD,
+        uint256 feeBNB,
+        uint256 bnbPrice
+    ) {
+        bnbPrice = getBNBPrice();
+        feeBNB = getClaimFeeInBNB();
+        return (claimFeeUSD, feeBNB, bnbPrice);
     }
     
     function startAirdrop(uint256 _duration, uint256 _maxClaimable) external onlyOwner {
@@ -83,6 +143,21 @@ contract PMAirdrop is Ownable {
     function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
         merkleRoot = _merkleRoot;
         emit MerkleRootUpdated(_merkleRoot);
+    }
+    
+    function setClaimFeeUSD(uint256 _feeUSD) external onlyOwner {
+        claimFeeUSD = _feeUSD;
+        emit ClaimFeeUpdated(_feeUSD);
+    }
+    
+    function setFeeCollector(address _collector) external onlyOwner {
+        require(_collector != address(0), "Invalid collector");
+        feeCollector = _collector;
+        emit FeeCollectorUpdated(_collector);
+    }
+    
+    function setPriceFeed(address _priceFeed) external onlyOwner {
+        priceFeed = AggregatorV3Interface(_priceFeed);
     }
     
     function setTaskReward(uint256 _taskId, uint256 _reward) external onlyOwner {
@@ -111,10 +186,19 @@ contract PMAirdrop is Ownable {
         emit AirdropClaimed(msg.sender, airdropAmount);
     }
     
-    function claimTask(uint256 _taskId) external {
+    /**
+     * @notice Claim reward for completing a task
+     * @param _taskId The ID of the completed task
+     * @dev Requires payment of claim fee in BNB
+     */
+    function claimTask(uint256 _taskId) external payable {
         require(isActive, "Airdrop not active");
         require(!taskCompleted[msg.sender][_taskId], "Task already completed");
         require(taskRewards[_taskId] > 0, "Invalid task");
+        
+        // Check fee payment
+        uint256 requiredFee = getClaimFeeInBNB();
+        require(msg.value >= requiredFee, "Insufficient fee");
         
         uint256 reward = taskRewards[_taskId];
         require(totalClaimed + reward <= maxClaimable, "Max claimable reached");
@@ -122,10 +206,16 @@ contract PMAirdrop is Ownable {
         taskCompleted[msg.sender][_taskId] = true;
         claimedAmount[msg.sender] += reward;
         totalClaimed += reward;
+        totalFeesCollected += msg.value;
         
         require(pmToken.transfer(msg.sender, reward), "Transfer failed");
         
-        emit TaskCompleted(msg.sender, _taskId, reward);
+        // Refund excess BNB if any
+        if (msg.value > requiredFee) {
+            payable(msg.sender).transfer(msg.value - requiredFee);
+        }
+        
+        emit TaskCompleted(msg.sender, _taskId, reward, msg.value);
     }
     
     function verify(
@@ -149,15 +239,24 @@ contract PMAirdrop is Ownable {
         require(pmToken.transfer(owner(), _amount), "Transfer failed");
     }
     
+    function withdrawFees() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No fees to withdraw");
+        payable(feeCollector).transfer(balance);
+        emit FeesWithdrawn(feeCollector, balance);
+    }
+    
     function getAirdropInfo() external view returns (
         uint256 _airdropAmount,
         uint256 _totalClaimed,
         uint256 _maxClaimable,
         uint256 _startTime,
         uint256 _endTime,
-        bool _isActive
+        bool _isActive,
+        uint256 _claimFeeUSD,
+        uint256 _totalFeesCollected
     ) {
-        return (airdropAmount, totalClaimed, maxClaimable, startTime, endTime, isActive);
+        return (airdropAmount, totalClaimed, maxClaimable, startTime, endTime, isActive, claimFeeUSD, totalFeesCollected);
     }
     
     function getUserInfo(address _user) external view returns (
@@ -181,4 +280,30 @@ contract PMAirdrop is Ownable {
         
         return (hasClaimed[_user], claimedAmount[_user], result);
     }
+    
+    /**
+     * @notice Get user's completed tasks as array
+     * @param _user User address
+     * @return Array of completed task IDs
+     */
+    function getUserTasks(address _user) external view returns (uint256[] memory) {
+        uint256[] memory completed = new uint256[](totalTasks);
+        uint256 count = 0;
+        for (uint256 i = 0; i < totalTasks; i++) {
+            if (taskCompleted[_user][i]) {
+                completed[count] = i;
+                count++;
+            }
+        }
+        
+        uint256[] memory result = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = completed[i];
+        }
+        
+        return result;
+    }
+    
+    // Allow contract to receive BNB
+    receive() external payable {}
 }
