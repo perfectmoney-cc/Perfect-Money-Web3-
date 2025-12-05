@@ -16,15 +16,38 @@ import { toast } from "sonner";
 import { FaFacebook, FaYoutube, FaTwitter, FaTelegram } from "react-icons/fa";
 import { SiTrustpilot, SiGoogle } from "react-icons/si";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatUnits } from 'viem';
+import { formatUnits, parseEther } from 'viem';
 import { PMAirdropABI } from "@/contracts/swapABI";
 import { CONTRACT_ADDRESSES } from "@/contracts/addresses";
 
 const PMAIRDROP_ADDRESS = CONTRACT_ADDRESSES[56].PMAirdrop as `0x${string}`;
+const CLAIM_FEE_USD = 0.01; // Fee in USD for each claim
 
 const AirdropPage = () => {
   const { address, isConnected } = useAccount();
   const [walletAddress, setWalletAddress] = useState("");
+  const [bnbPrice, setBnbPrice] = useState<number>(600); // Default fallback price
+
+  // Fetch BNB price
+  useEffect(() => {
+    const fetchBnbPrice = async () => {
+      try {
+        const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT');
+        const data = await response.json();
+        if (data.price) {
+          setBnbPrice(parseFloat(data.price));
+        }
+      } catch (error) {
+        console.error('Failed to fetch BNB price:', error);
+      }
+    };
+    fetchBnbPrice();
+    const interval = setInterval(fetchBnbPrice, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate BNB amount for $0.01 fee
+  const claimFeeBnb = CLAIM_FEE_USD / bnbPrice;
 
   // Check if contract is deployed
   const isContractDeployed = PMAIRDROP_ADDRESS !== "0x0000000000000000000000000000000000000000";
@@ -232,12 +255,18 @@ const AirdropPage = () => {
     }
 
     try {
+      // Calculate fee: $0.01 worth of BNB
+      const feeInBnb = parseEther(claimFeeBnb.toFixed(18));
+      
       writeContract({
         address: PMAIRDROP_ADDRESS,
         abi: PMAirdropABI,
         functionName: 'claimTask',
         args: [BigInt(taskId)],
+        value: feeInBnb,
       } as any);
+      
+      toast.info(`Claiming task with $${CLAIM_FEE_USD} fee (~${claimFeeBnb.toFixed(6)} BNB)`);
     } catch (error: any) {
       toast.error(error?.message || "Failed to claim task reward");
     }
@@ -400,6 +429,15 @@ const AirdropPage = () => {
                   +{taskReward} PM each
                 </span>
               </h2>
+              
+              {/* Fee Notice */}
+              <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <p className="text-xs text-yellow-400 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <span>Each claim requires a small fee of <strong>${CLAIM_FEE_USD}</strong> (~{claimFeeBnb.toFixed(6)} BNB)</span>
+                </p>
+              </div>
+              
               <div className="space-y-3">
                 {tasks.map(task => {
                   const Icon = task.icon;
