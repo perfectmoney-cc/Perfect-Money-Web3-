@@ -120,18 +120,21 @@ const AirdropPage = () => {
     query: { enabled: isContractDeployed }
   });
 
-  // Get claim fee info from contract
-  const { data: claimFeeInfo } = useReadContract({
+  // Get fee info from contract (includes claim fee + network fee)
+  const { data: feeInfo } = useReadContract({
     address: PMAIRDROP_ADDRESS,
     abi: PMAirdropABI,
-    functionName: 'getClaimFeeInfo',
+    functionName: 'getFeeInfo',
     chainId: 56,
     query: { enabled: isContractDeployed }
   });
 
-  // Use contract fee if available, otherwise use calculated fee
-  const contractFeeBnb = claimFeeInfo ? Number(formatUnits((claimFeeInfo as any)[1] as bigint, 18)) : null;
-  const effectiveClaimFeeBnb = contractFeeBnb ?? claimFeeBnb;
+  // Use contract total fee if available, otherwise use calculated fee
+  // getFeeInfo returns: [claimFeeUSD, networkFeeUSD, totalFeeUSD, claimFeeBNB, networkFeeBNB, totalFeeBNB, bnbPrice]
+  const contractTotalFeeBnb = feeInfo ? Number(formatUnits((feeInfo as any)[5] as bigint, 18)) : null;
+  const contractClaimFeeBnb = feeInfo ? Number(formatUnits((feeInfo as any)[3] as bigint, 18)) : null;
+  const contractNetworkFeeBnb = feeInfo ? Number(formatUnits((feeInfo as any)[4] as bigint, 18)) : null;
+  const effectiveClaimFeeBnb = contractTotalFeeBnb ?? claimFeeBnb;
   const hasEnoughBnb = userBnbBalance >= effectiveClaimFeeBnb;
 
   // User-specific data
@@ -371,10 +374,15 @@ const AirdropPage = () => {
         <div className="md:hidden mt-5 mb-6">
           <WalletCard showQuickFunctionsToggle={false} compact={true} />
         </div>
-        <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+          <Link to="/dashboard/airdrop/admin" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
+            Admin Panel
+          </Link>
+        </div>
 
         {/* Stats Card */}
         <Card className="p-4 mb-4 bg-gradient-to-br from-primary/10 to-secondary/10 backdrop-blur-sm border-primary/30">
@@ -656,11 +664,15 @@ const AirdropPage = () => {
               <div className="p-3 bg-muted rounded-lg space-y-2 mt-4">
                 <div className="flex justify-between text-sm">
                   <span>Claim Fee:</span>
-                  <span className="font-medium">${CLAIM_FEE_USD} USD</span>
+                  <span className="font-medium">${CLAIM_FEE_USD} ({contractClaimFeeBnb?.toFixed(6) || "..."} BNB)</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Fee in BNB:</span>
-                  <span className="font-medium">{effectiveClaimFeeBnb.toFixed(6)} BNB</span>
+                  <span>Network Fee:</span>
+                  <span className="font-medium">${CLAIM_FEE_USD} ({contractNetworkFeeBnb?.toFixed(6) || "..."} BNB)</span>
+                </div>
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Total Fee:</span>
+                  <span className="text-primary">{effectiveClaimFeeBnb.toFixed(6)} BNB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Your Balance:</span>

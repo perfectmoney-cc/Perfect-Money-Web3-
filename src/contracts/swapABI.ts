@@ -284,21 +284,57 @@ export const PMAirdropABI = [
   { inputs: [], name: "totalTasks", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "owner", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "claimFeeUSD", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "networkFeeUSD", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "totalFeesCollected", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "totalNetworkFeesCollected", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "feeCollector", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "airdropAmount", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "hasClaimed", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "claimedAmount", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }, { name: "taskId", type: "uint256" }], name: "taskCompleted", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "taskId", type: "uint256" }], name: "taskRewards", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "taskId", type: "uint256" }], name: "taskNames", outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "taskId", type: "uint256" }], name: "taskLinks", outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "taskId", type: "uint256" }], name: "taskEnabled", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "getBNBPrice", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "getClaimFeeInBNB", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "getNetworkFeeInBNB", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "getTotalFeeInBNB", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   {
     inputs: [],
-    name: "getClaimFeeInfo",
+    name: "getFeeInfo",
     outputs: [
-      { name: "feeUSD", type: "uint256" },
-      { name: "feeBNB", type: "uint256" },
+      { name: "claimFee", type: "uint256" },
+      { name: "networkFee", type: "uint256" },
+      { name: "totalFeeUSD", type: "uint256" },
+      { name: "claimFeeBNB", type: "uint256" },
+      { name: "networkFeeBNB", type: "uint256" },
+      { name: "totalFeeBNB", type: "uint256" },
       { name: "bnbPrice", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "_taskId", type: "uint256" }],
+    name: "getTaskInfo",
+    outputs: [
+      { name: "name", type: "string" },
+      { name: "link", type: "string" },
+      { name: "reward", type: "uint256" },
+      { name: "enabled", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "getAllTasks",
+    outputs: [
+      { name: "names", type: "string[]" },
+      { name: "links", type: "string[]" },
+      { name: "rewards", type: "uint256[]" },
+      { name: "enabledList", type: "bool[]" }
     ],
     stateMutability: "view",
     type: "function"
@@ -321,7 +357,9 @@ export const PMAirdropABI = [
       { name: "_endTime", type: "uint256" },
       { name: "_isActive", type: "bool" },
       { name: "_claimFeeUSD", type: "uint256" },
-      { name: "_totalFeesCollected", type: "uint256" }
+      { name: "_networkFeeUSD", type: "uint256" },
+      { name: "_totalFeesCollected", type: "uint256" },
+      { name: "_totalNetworkFeesCollected", type: "uint256" }
     ],
     stateMutability: "view",
     type: "function"
@@ -337,26 +375,71 @@ export const PMAirdropABI = [
     stateMutability: "view",
     type: "function"
   },
-  // Write functions
   {
-    inputs: [{ name: "proof", type: "bytes32[]" }],
-    name: "claim",
+    inputs: [],
+    name: "getAdminInfo",
+    outputs: [
+      { name: "_owner", type: "address" },
+      { name: "_feeCollector", type: "address" },
+      { name: "_priceFeed", type: "address" },
+      { name: "_pmToken", type: "address" },
+      { name: "_contractBalance", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  // Write functions (Admin)
+  { inputs: [{ name: "_duration", type: "uint256" }, { name: "_maxClaimable", type: "uint256" }], name: "startAirdrop", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [], name: "endAirdrop", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [], name: "resumeAirdrop", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_merkleRoot", type: "bytes32" }], name: "setMerkleRoot", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_feeUSD", type: "uint256" }], name: "setClaimFeeUSD", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_feeUSD", type: "uint256" }], name: "setNetworkFeeUSD", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_collector", type: "address" }], name: "setFeeCollector", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_priceFeed", type: "address" }], name: "setPriceFeed", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_amount", type: "uint256" }], name: "setAirdropAmount", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_maxClaimable", type: "uint256" }], name: "setMaxClaimable", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_taskId", type: "uint256" }, { name: "_reward", type: "uint256" }], name: "setTaskReward", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "_taskId", type: "uint256" }, { name: "_enabled", type: "bool" }], name: "setTaskEnabled", outputs: [], stateMutability: "nonpayable", type: "function" },
+  {
+    inputs: [
+      { name: "_taskId", type: "uint256" },
+      { name: "_name", type: "string" },
+      { name: "_link", type: "string" },
+      { name: "_reward", type: "uint256" },
+      { name: "_enabled", type: "bool" }
+    ],
+    name: "configureTask",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function"
   },
   {
-    inputs: [{ name: "taskId", type: "uint256" }],
-    name: "claimTask",
+    inputs: [
+      { name: "_taskIds", type: "uint256[]" },
+      { name: "_names", type: "string[]" },
+      { name: "_links", type: "string[]" },
+      { name: "_rewards", type: "uint256[]" },
+      { name: "_enabledList", type: "bool[]" }
+    ],
+    name: "batchConfigureTasks",
     outputs: [],
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     type: "function"
   },
+  { inputs: [{ name: "_amount", type: "uint256" }], name: "withdrawTokens", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [], name: "withdrawFees", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "newOwner", type: "address" }], name: "transferOwnership", outputs: [], stateMutability: "nonpayable", type: "function" },
+  // Write functions (User)
+  { inputs: [{ name: "proof", type: "bytes32[]" }], name: "claim", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "taskId", type: "uint256" }], name: "claimTask", outputs: [], stateMutability: "payable", type: "function" },
   // Events
   { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "AirdropClaimed", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: false, name: "taskId", type: "uint256" }, { indexed: false, name: "reward", type: "uint256" }, { indexed: false, name: "feePaid", type: "uint256" }], name: "TaskCompleted", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "user", type: "address" }, { indexed: false, name: "taskId", type: "uint256" }, { indexed: false, name: "reward", type: "uint256" }, { indexed: false, name: "claimFeePaid", type: "uint256" }, { indexed: false, name: "networkFeePaid", type: "uint256" }], name: "TaskCompleted", type: "event" },
   { anonymous: false, inputs: [{ indexed: false, name: "newFeeUSD", type: "uint256" }], name: "ClaimFeeUpdated", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "to", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "FeesWithdrawn", type: "event" },
+  { anonymous: false, inputs: [{ indexed: false, name: "newFeeUSD", type: "uint256" }], name: "NetworkFeeUpdated", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "to", type: "address" }, { indexed: false, name: "claimFees", type: "uint256" }, { indexed: false, name: "networkFees", type: "uint256" }], name: "FeesWithdrawn", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "taskId", type: "uint256" }, { indexed: false, name: "name", type: "string" }, { indexed: false, name: "link", type: "string" }, { indexed: false, name: "reward", type: "uint256" }, { indexed: false, name: "enabled", type: "bool" }], name: "TaskConfigured", type: "event" },
 ] as const;
 
 // PancakeSwap Pair ABI for liquidity info
