@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ShoppingCart, TrendingUp, Package, ChevronLeft, ChevronRight, CheckCircle2, Gavel, History, Eye, Clock, User, Timer, Plus, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { ipfsToHttp } from "@/utils/ipfsService";
+import { NFTImage } from "@/components/NFTImage";
 
 interface MarketItem {
   id: number;
@@ -431,16 +433,12 @@ const MarketplacePage = () => {
                   className="overflow-hidden hover:shadow-glow transition-all cursor-pointer border-2 border-yellow-500/20 hover:border-yellow-500/50"
                   onClick={() => handleViewDetails(item)}
                 >
-                  <div className="aspect-square bg-muted/50 relative flex items-center justify-center">
-                    {item.image ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Package className="h-12 w-12 text-muted-foreground" />
-                    )}
-                    <Badge className="absolute top-2 left-2 bg-yellow-500 text-black">
+                  <div className="aspect-square bg-muted/50 relative overflow-hidden">
+                    <NFTImage src={item.image} alt={item.name} />
+                    <Badge className="absolute top-2 left-2 bg-yellow-500 text-black z-10">
                       #{index + 1} Trending
                     </Badge>
-                    <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                    <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 z-10">
                       <Eye className="h-3 w-3" />
                       <span className="text-xs">{item.views}</span>
                     </div>
@@ -548,12 +546,8 @@ const MarketplacePage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {marketItems.map((item) => (
                   <Card key={item.id} className="overflow-hidden hover:shadow-glow transition-all group cursor-pointer" onClick={() => handleViewDetails(item)}>
-                    <div className="aspect-square bg-muted/50 relative flex items-center justify-center">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Package className="h-16 w-16 text-muted-foreground" />
-                      )}
+                    <div className="aspect-square bg-muted/50 relative overflow-hidden">
+                      <NFTImage src={item.image} alt={item.name} />
                       {item.isAuction && (
                         <Badge className="absolute top-3 left-3 bg-primary text-white">
                           <Gavel className="h-3 w-3 mr-1" />
@@ -642,12 +636,8 @@ const MarketplacePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {ownedNFTs.map((nft) => (
                     <Card key={nft.id} className="overflow-hidden hover:shadow-glow transition-all">
-                      <div className="aspect-square bg-muted/50 flex items-center justify-center">
-                        {nft.image ? (
-                          <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Package className="h-16 w-16 text-muted-foreground" />
-                        )}
+                      <div className="aspect-square bg-muted/50 overflow-hidden">
+                        <NFTImage src={nft.image} alt={nft.name} />
                       </div>
                       <div className="p-4 space-y-3">
                         <div>
@@ -687,12 +677,8 @@ const MarketplacePage = () => {
 
           {detailItem && (
             <div className="space-y-4 py-4">
-              <div className="aspect-square bg-muted/50 rounded-lg flex items-center justify-center overflow-hidden">
-                {detailItem.image ? (
-                  <img src={detailItem.image} alt={detailItem.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Package className="h-24 w-24 text-muted-foreground" />
-                )}
+              <div className="aspect-square bg-muted/50 rounded-lg overflow-hidden">
+                <NFTImage src={detailItem.image} alt={detailItem.name} fallbackClassName="h-24 w-24 text-muted-foreground" />
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -828,12 +814,8 @@ const MarketplacePage = () => {
           {selectedItem && (
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-muted/50 rounded-lg flex items-center justify-center overflow-hidden">
-                  {selectedItem.image ? (
-                    <img src={selectedItem.image} alt={selectedItem.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Package className="h-10 w-10 text-muted-foreground" />
-                  )}
+                <div className="w-20 h-20 bg-muted/50 rounded-lg overflow-hidden">
+                  <NFTImage src={selectedItem.image} alt={selectedItem.name} fallbackClassName="h-10 w-10 text-muted-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold">{selectedItem.name}</h3>
