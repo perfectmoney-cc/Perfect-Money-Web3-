@@ -8,7 +8,20 @@ import { TradingViewTicker } from "@/components/TradingViewTicker";
 import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
-import { ArrowLeft, Handshake, Building2, User, Mail, Phone, Globe, MapPin, Calendar, Users, FileText, Upload } from "lucide-react";
+import {
+  ArrowLeft,
+  Handshake,
+  Building2,
+  User,
+  Mail,
+  Phone,
+  Globe,
+  MapPin,
+  Calendar,
+  Users,
+  FileText,
+  Upload,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -36,20 +49,20 @@ const ApplyPartnership = () => {
   });
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Google Apps Script web app URL for form submission
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0ZANQc9fm1140WSIUhb236USEAkI738TSm__2gV53jcoxcomeM_R9jsFXk4RFQlnDQg/exec";
+  const GOOGLE_SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycby0ZANQc9fm1140WSIUhb236USEAkI738TSm__2gV53jcoxcomeM_R9jsFXk4RFQlnDQg/exec";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    
+
     setIsSubmitting(true);
-    
+
     try {
       // Send data to Google Apps Script (no-cors required for Apps Script)
       await fetch(GOOGLE_SCRIPT_URL, {
@@ -63,13 +76,28 @@ const ApplyPartnership = () => {
       });
 
       // With no-cors we can't read response, but if no error thrown, assume success
-      toast.success("Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.");
+      toast.success(
+        "Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.",
+      );
       setFormData({
-        companyName: "", industrySector: "", websiteUrl: "", headquarters: "",
-        yearEstablished: "", companySize: "", contactName: "", jobTitle: "",
-        email: "", phone: "", alternativeContact: "", companyOverview: "",
-        keyProducts: "", targetSegments: "", partnershipObjectives: "",
-        integrationModel: "", expectedValue: "", comments: "",
+        companyName: "",
+        industrySector: "",
+        websiteUrl: "",
+        headquarters: "",
+        yearEstablished: "",
+        companySize: "",
+        contactName: "",
+        jobTitle: "",
+        email: "",
+        phone: "",
+        alternativeContact: "",
+        companyOverview: "",
+        keyProducts: "",
+        targetSegments: "",
+        partnershipObjectives: "",
+        integrationModel: "",
+        expectedValue: "",
+        comments: "",
       });
     } catch (error) {
       console.error("Error submitting application:", error);
@@ -83,13 +111,16 @@ const ApplyPartnership = () => {
     <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
       <Header />
       <TradingViewTicker />
-      <HeroBanner 
-        title="Partnership Application" 
+      <HeroBanner
+        title="Partnership Application"
         subtitle="Please provide accurate information to help us evaluate your partnership request"
       />
-      
+
       <main className="container mx-auto px-4 pt-12 pb-12 flex-1">
-        <Link to="/dashboard/partners" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6">
+        <Link
+          to="/dashboard/partners"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Partners
         </Link>
@@ -112,15 +143,15 @@ const ApplyPartnership = () => {
                 <Building2 className="h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold">Company Information</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Company Name *</label>
-                  <Input 
-                    placeholder="Enter your registered legal business name" 
+                  <Input
+                    placeholder="Enter your registered legal business name"
                     value={formData.companyName}
                     onChange={(e) => handleChange("companyName", e.target.value)}
-                    required 
+                    required
                   />
                 </div>
                 <div>
@@ -147,13 +178,13 @@ const ApplyPartnership = () => {
                   <label className="text-sm font-medium mb-2 block">Website URL *</label>
                   <div className="relative">
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      type="url" 
-                      placeholder="https://www.yourcompany.com" 
+                    <Input
+                      type="url"
+                      placeholder="https://www.yourcompany.com"
                       className="pl-10"
                       value={formData.websiteUrl}
                       onChange={(e) => handleChange("websiteUrl", e.target.value)}
-                      required 
+                      required
                     />
                   </div>
                 </div>
@@ -161,12 +192,12 @@ const ApplyPartnership = () => {
                   <label className="text-sm font-medium mb-2 block">Headquarters Location *</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="City, Country" 
+                    <Input
+                      placeholder="City, Country"
                       className="pl-10"
                       value={formData.headquarters}
                       onChange={(e) => handleChange("headquarters", e.target.value)}
-                      required 
+                      required
                     />
                   </div>
                 </div>
@@ -174,12 +205,12 @@ const ApplyPartnership = () => {
                   <label className="text-sm font-medium mb-2 block">Year Established *</label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="e.g., 2015" 
+                    <Input
+                      placeholder="e.g., 2015"
                       className="pl-10"
                       value={formData.yearEstablished}
                       onChange={(e) => handleChange("yearEstablished", e.target.value)}
-                      required 
+                      required
                     />
                   </div>
                 </div>
@@ -208,37 +239,37 @@ const ApplyPartnership = () => {
                 <User className="h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold">Primary Contact Details</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Contact Person Name *</label>
-                  <Input 
-                    placeholder="Full legal name of the primary representative" 
+                  <Input
+                    placeholder="Full legal name of the primary representative"
                     value={formData.contactName}
                     onChange={(e) => handleChange("contactName", e.target.value)}
-                    required 
+                    required
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Position / Job Title *</label>
-                  <Input 
-                    placeholder="e.g., Business Development Manager, CEO" 
+                  <Input
+                    placeholder="e.g., Business Development Manager, CEO"
                     value={formData.jobTitle}
                     onChange={(e) => handleChange("jobTitle", e.target.value)}
-                    required 
+                    required
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Email Address *</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      type="email" 
-                      placeholder="business@yourcompany.com" 
+                    <Input
+                      type="email"
+                      placeholder="business@yourcompany.com"
                       className="pl-10"
                       value={formData.email}
                       onChange={(e) => handleChange("email", e.target.value)}
-                      required 
+                      required
                     />
                   </div>
                 </div>
@@ -246,20 +277,20 @@ const ApplyPartnership = () => {
                   <label className="text-sm font-medium mb-2 block">Phone Number *</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      type="tel" 
-                      placeholder="+1 (555) 123-4567" 
+                    <Input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
                       className="pl-10"
                       value={formData.phone}
                       onChange={(e) => handleChange("phone", e.target.value)}
-                      required 
+                      required
                     />
                   </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium mb-2 block">Alternative Contact (Optional)</label>
-                  <Input 
-                    placeholder="Name, Email, or Phone" 
+                  <Input
+                    placeholder="Name, Email, or Phone"
                     value={formData.alternativeContact}
                     onChange={(e) => handleChange("alternativeContact", e.target.value)}
                   />
@@ -273,11 +304,11 @@ const ApplyPartnership = () => {
                 <FileText className="h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold">Business Overview</h2>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Company Overview *</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="Briefly describe your organization, services, and operational markets..."
                     className="min-h-[120px]"
                     value={formData.companyOverview}
@@ -287,7 +318,7 @@ const ApplyPartnership = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Key Products or Services *</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="e.g., crypto exchange, payment processor, wallet service, compliance solutions, merchant tools"
                     className="min-h-[80px]"
                     value={formData.keyProducts}
@@ -297,7 +328,7 @@ const ApplyPartnership = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Target Customer Segments *</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="e.g., retail clients, enterprises, merchants, fintechs, institutional traders"
                     className="min-h-[80px]"
                     value={formData.targetSegments}
@@ -314,11 +345,11 @@ const ApplyPartnership = () => {
                 <Handshake className="h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold">Partnership Proposal</h2>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Partnership Objectives *</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="How would you like to collaborate with Perfect Money? Please outline your goals..."
                     className="min-h-[120px]"
                     value={formData.partnershipObjectives}
@@ -328,7 +359,7 @@ const ApplyPartnership = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Proposed Integration or Cooperation Model *</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="e.g., API integration, co-branding, payment solutions, merchant onboarding, liquidity partnership, technology collaboration"
                     className="min-h-[100px]"
                     value={formData.integrationModel}
@@ -338,7 +369,7 @@ const ApplyPartnership = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Expected Value for Both Parties *</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="Describe the mutual benefits and business impact..."
                     className="min-h-[100px]"
                     value={formData.expectedValue}
@@ -355,7 +386,7 @@ const ApplyPartnership = () => {
                 <Upload className="h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold">Additional Information (Optional)</h2>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Supporting Documents</label>
@@ -364,14 +395,12 @@ const ApplyPartnership = () => {
                     <p className="text-sm text-muted-foreground">
                       Upload pitch decks, product documentation, or compliance certificates
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      PDF, DOC, DOCX, PPT, PPTX (Max 10MB)
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX, PPT, PPTX (Max 10MB)</p>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">Comments or Notes</label>
-                  <Textarea 
+                  <Textarea
                     placeholder="Any additional details relevant to your application..."
                     className="min-h-[100px]"
                     value={formData.comments}
@@ -383,7 +412,12 @@ const ApplyPartnership = () => {
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button type="submit" variant="gradient" className="flex-1 sm:flex-none sm:min-w-[200px]" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                variant="gradient"
+                className="flex-1 sm:flex-none sm:min-w-[200px]"
+                disabled={isSubmitting}
+              >
                 <Building2 className="h-4 w-4 mr-2" />
                 {isSubmitting ? "Submitting..." : "Submit Application"}
               </Button>
