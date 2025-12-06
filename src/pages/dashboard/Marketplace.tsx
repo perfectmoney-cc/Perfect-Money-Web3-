@@ -94,12 +94,14 @@ const MarketplacePage = () => {
   const mintedNFTs = JSON.parse(localStorage.getItem("mintedNFTs") || "[]");
 
   // Generate market items including minted ones
+  const nftCategories = ["PM Digital Card", "PM Voucher Card", "PM Gift Cards", "PM Partner Badge", "PM Discount Card", "PM VIP Exclusive Card"];
+
   const generateMarketItems = (): MarketItem[] => {
     const defaultItems: MarketItem[] = Array.from({ length: 15 }, (_, i) => ({
       id: i + 1,
       name: `Digital Asset #${i + 1}`,
       price: Math.floor(Math.random() * 1000) + 100,
-      category: ["Art", "Collectibles", "Music", "Gaming"][Math.floor(Math.random() * 4)],
+      category: nftCategories[Math.floor(Math.random() * nftCategories.length)],
       date: new Date(2024, 0, Math.floor(Math.random() * 30) + 1),
       views: Math.floor(Math.random() * 1000) + 100,
       description: `Premium digital collectible verified on BSC blockchain. Unique and authenticated.`,
@@ -473,7 +475,12 @@ const MarketplacePage = () => {
                         </div>
                       </td>
                       <td className="py-3 pr-4 text-center font-semibold">{minter.minted}</td>
-                      <td className="py-3 text-right font-bold text-primary">{minter.volume.toLocaleString()}</td>
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="font-bold text-primary">{minter.volume.toLocaleString()}</span>
+                          <img src={pmLogo} alt="PM" className="h-4 w-4" />
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

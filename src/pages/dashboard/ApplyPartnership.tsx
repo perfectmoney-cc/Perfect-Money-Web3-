@@ -39,9 +39,40 @@ const ApplyPartnership = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.");
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-partnership`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        toast.success("Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.");
+        setFormData({
+          companyName: "", industrySector: "", websiteUrl: "", headquarters: "",
+          yearEstablished: "", companySize: "", contactName: "", jobTitle: "",
+          email: "", phone: "", alternativeContact: "", companyOverview: "",
+          keyProducts: "", targetSegments: "", partnershipObjectives: "",
+          integrationModel: "", expectedValue: "", comments: "",
+        });
+      } else {
+        throw new Error("Submission failed");
+      }
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      toast.error("Failed to submit application. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -348,9 +379,9 @@ const ApplyPartnership = () => {
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button type="submit" variant="gradient" className="flex-1 sm:flex-none sm:min-w-[200px]">
+              <Button type="submit" variant="gradient" className="flex-1 sm:flex-none sm:min-w-[200px]" disabled={isSubmitting}>
                 <Building2 className="h-4 w-4 mr-2" />
-                Submit Application
+                {isSubmitting ? "Submitting..." : "Submit Application"}
               </Button>
               <Link to="/dashboard/partners" className="flex-1 sm:flex-none">
                 <Button type="button" variant="outline" className="w-full">
