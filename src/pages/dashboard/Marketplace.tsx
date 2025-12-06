@@ -18,6 +18,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ipfsToHttp } from "@/utils/ipfsService";
 import { NFTImage } from "@/components/NFTImage";
+import { NFTSkeletonGrid, TrendingNFTSkeletonGrid, AnalyticsCardSkeleton } from "@/components/NFTSkeletonGrid";
 
 interface MarketItem {
   id: number;
@@ -68,7 +69,14 @@ const MarketplacePage = () => {
   const [isAuctionListing, setIsAuctionListing] = useState(false);
   const [auctionDuration, setAuctionDuration] = useState("24");
   const [startingBid, setStartingBid] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 12;
+
+  // Simulate initial loading
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Load owned NFTs from localStorage
   useEffect(() => {
@@ -391,34 +399,38 @@ const MarketplacePage = () => {
 
         <div className="max-w-7xl mx-auto">
           {/* Collection Analytics */}
-          <Card className="p-6 bg-card/50 backdrop-blur-sm mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold">Collection Analytics</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center p-4 rounded-lg bg-muted/50">
-                <p className="text-2xl font-bold text-primary">{analyticsData.totalVolume.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Total Volume (PM)</p>
+          {isLoading ? (
+            <AnalyticsCardSkeleton />
+          ) : (
+            <Card className="p-6 bg-card/50 backdrop-blur-sm mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold">Collection Analytics</h2>
               </div>
-              <div className="text-center p-4 rounded-lg bg-muted/50">
-                <p className="text-2xl font-bold text-green-500">{analyticsData.totalSales.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Total Sales</p>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <p className="text-2xl font-bold text-primary">{analyticsData.totalVolume.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total Volume (PM)</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <p className="text-2xl font-bold text-green-500">{analyticsData.totalSales.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total Sales</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <p className="text-2xl font-bold text-yellow-500">{analyticsData.floorPrice}</p>
+                  <p className="text-xs text-muted-foreground">Floor Price (PM)</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <p className="text-2xl font-bold text-blue-500">{analyticsData.owners}</p>
+                  <p className="text-xs text-muted-foreground">Unique Owners</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <p className="text-2xl font-bold text-purple-500">{analyticsData.listed}</p>
+                  <p className="text-xs text-muted-foreground">Listed Items</p>
+                </div>
               </div>
-              <div className="text-center p-4 rounded-lg bg-muted/50">
-                <p className="text-2xl font-bold text-yellow-500">{analyticsData.floorPrice}</p>
-                <p className="text-xs text-muted-foreground">Floor Price (PM)</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-muted/50">
-                <p className="text-2xl font-bold text-blue-500">{analyticsData.owners}</p>
-                <p className="text-xs text-muted-foreground">Unique Owners</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-muted/50">
-                <p className="text-2xl font-bold text-purple-500">{analyticsData.listed}</p>
-                <p className="text-xs text-muted-foreground">Listed Items</p>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {/* Trending NFTs Section */}
           <div className="mb-8">
@@ -426,33 +438,37 @@ const MarketplacePage = () => {
               <Sparkles className="h-5 w-5 text-yellow-500" />
               <h2 className="text-lg font-bold">Trending NFTs</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {trendingNFTs.map((item, index) => (
-                <Card 
-                  key={`trending-${item.id}`} 
-                  className="overflow-hidden hover:shadow-glow transition-all cursor-pointer border-2 border-yellow-500/20 hover:border-yellow-500/50"
-                  onClick={() => handleViewDetails(item)}
-                >
-                  <div className="aspect-square bg-muted/50 relative overflow-hidden">
-                    <NFTImage src={item.image} alt={item.name} />
-                    <Badge className="absolute top-2 left-2 bg-yellow-500 text-black z-10">
-                      #{index + 1} Trending
-                    </Badge>
-                    <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 z-10">
-                      <Eye className="h-3 w-3" />
-                      <span className="text-xs">{item.views}</span>
+            {isLoading ? (
+              <TrendingNFTSkeletonGrid />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {trendingNFTs.map((item, index) => (
+                  <Card 
+                    key={`trending-${item.id}`} 
+                    className="overflow-hidden hover:shadow-glow transition-all cursor-pointer border-2 border-yellow-500/20 hover:border-yellow-500/50"
+                    onClick={() => handleViewDetails(item)}
+                  >
+                    <div className="aspect-square bg-muted/50 relative overflow-hidden">
+                      <NFTImage src={item.image} alt={item.name} />
+                      <Badge className="absolute top-2 left-2 bg-yellow-500 text-black z-10">
+                        #{index + 1} Trending
+                      </Badge>
+                      <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 z-10">
+                        <Eye className="h-3 w-3" />
+                        <span className="text-xs">{item.views}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-bold text-sm truncate">{item.name}</h3>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-primary font-bold text-sm">{item.price} PM</span>
-                      <span className="text-xs text-muted-foreground">{item.category}</span>
+                    <div className="p-3">
+                      <h3 className="font-bold text-sm truncate">{item.name}</h3>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-primary font-bold text-sm">{item.price} PM</span>
+                        <span className="text-xs text-muted-foreground">{item.category}</span>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Top Minters Leaderboard */}
@@ -543,55 +559,59 @@ const MarketplacePage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {marketItems.map((item) => (
-                  <Card key={item.id} className="overflow-hidden hover:shadow-glow transition-all group cursor-pointer" onClick={() => handleViewDetails(item)}>
-                    <div className="aspect-square bg-muted/50 relative overflow-hidden">
-                      <NFTImage src={item.image} alt={item.name} />
-                      {item.isAuction && (
-                        <Badge className="absolute top-3 left-3 bg-primary text-white">
-                          <Gavel className="h-3 w-3 mr-1" />
-                          Auction
-                        </Badge>
-                      )}
-                      <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                        <Eye className="h-3 w-3" />
-                        <span className="text-xs">{item.views}</span>
+              {isLoading ? (
+                <NFTSkeletonGrid count={12} columns={4} />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {marketItems.map((item) => (
+                    <Card key={item.id} className="overflow-hidden hover:shadow-glow transition-all group cursor-pointer" onClick={() => handleViewDetails(item)}>
+                      <div className="aspect-square bg-muted/50 relative overflow-hidden">
+                        <NFTImage src={item.image} alt={item.name} />
+                        {item.isAuction && (
+                          <Badge className="absolute top-3 left-3 bg-primary text-white z-10">
+                            <Gavel className="h-3 w-3 mr-1" />
+                            Auction
+                          </Badge>
+                        )}
+                        <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 z-10">
+                          <Eye className="h-3 w-3" />
+                          <span className="text-xs">{item.views}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      <div>
-                        <h3 className="font-bold mb-1">{item.name}</h3>
-                        <p className="text-sm text-muted-foreground">{item.category}</p>
-                      </div>
-                      
-                      {item.isAuction ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Current Bid</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-bold text-primary">{item.highestBid || item.price}</span>
-                              <img src={pmLogo} alt="PM" className="h-4 w-4" />
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <h3 className="font-bold mb-1">{item.name}</h3>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                        </div>
+                        
+                        {item.isAuction ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Current Bid</span>
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold text-primary">{item.highestBid || item.price}</span>
+                                <img src={pmLogo} alt="PM" className="h-4 w-4" />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Timer className="h-3 w-3" />
+                              <span>Ends in {formatTimeRemaining(item.auctionEndTime!)}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Timer className="h-3 w-3" />
-                            <span>Ends in {formatTimeRemaining(item.auctionEndTime!)}</span>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                              <span className="text-primary font-bold">{item.price}</span>
+                              <img src={pmLogo} alt="PM" className="h-4 w-4" />
+                              <span className="text-primary font-bold">PM</span>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1">
-                            <span className="text-primary font-bold">{item.price}</span>
-                            <img src={pmLogo} alt="PM" className="h-4 w-4" />
-                            <span className="text-primary font-bold">PM</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
 
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2">
