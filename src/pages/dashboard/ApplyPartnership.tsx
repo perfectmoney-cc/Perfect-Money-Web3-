@@ -41,16 +41,12 @@ const ApplyPartnership = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Replace this URL with your deployed Google Apps Script web app URL
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+  // Google Apps Script web app URL for form submission
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0ZANQc9fm1140WSIUhb236USEAkI738TSm__2gV53jcoxcomeM_R9jsFXk4RFQlnDQg/exec";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (GOOGLE_SCRIPT_URL.includes("YOUR_SCRIPT_ID")) {
-      toast.error("Please configure the Google Apps Script URL first");
-      return;
-    }
     
     setIsSubmitting(true);
     

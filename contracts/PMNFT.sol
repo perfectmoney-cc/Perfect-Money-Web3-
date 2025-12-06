@@ -19,6 +19,10 @@ interface IERC20 {
 contract PMNFT is ERC721, ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGuard {
     IERC20 public immutable pmToken;
 
+    // PM Token NFT Categories
+    string[] public validCategories;
+    mapping(string => bool) public isValidCategory;
+
     uint256 private _tokenIdCounter;
     uint256 public mintingFee = 10000 * 10**18; // 10,000 PM tokens
     uint256 public listingFee = 0; // Optional listing fee in PM
@@ -74,6 +78,28 @@ contract PMNFT is ERC721, ERC721URIStorage, ERC721Enumerable, Ownable, Reentranc
         require(_pmToken != address(0), "Zero token address");
         pmToken = IERC20(_pmToken);
         feeCollector = msg.sender;
+        
+        // Initialize PM Token NFT categories
+        _addCategory("PM Digital Card");
+        _addCategory("PM Voucher Card");
+        _addCategory("PM Gift Cards");
+        _addCategory("PM Partner Badge");
+        _addCategory("PM Discount Card");
+        _addCategory("PM VIP Exclusive Card");
+    }
+
+    function _addCategory(string memory _category) internal {
+        validCategories.push(_category);
+        isValidCategory[_category] = true;
+    }
+
+    function addCategory(string memory _category) external onlyOwner {
+        require(!isValidCategory[_category], "Category exists");
+        _addCategory(_category);
+    }
+
+    function getCategories() external view returns (string[] memory) {
+        return validCategories;
     }
 
     /// @notice Mint a new NFT
@@ -90,6 +116,7 @@ contract PMNFT is ERC721, ERC721URIStorage, ERC721Enumerable, Ownable, Reentranc
         uint256 _royaltyPercent
     ) external nonReentrant returns (uint256) {
         require(_royaltyPercent <= 10, "Royalty too high");
+        require(isValidCategory[_category], "Invalid category");
         
         uint256 balance = pmToken.balanceOf(msg.sender);
         if (balance < mintingFee) revert InsufficientBalance(mintingFee, balance);
