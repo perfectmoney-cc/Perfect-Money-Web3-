@@ -41,32 +41,40 @@ const ApplyPartnership = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Replace this URL with your deployed Google Apps Script web app URL
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (GOOGLE_SCRIPT_URL.includes("YOUR_SCRIPT_ID")) {
+      toast.error("Please configure the Google Apps Script URL first");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-partnership`, {
+      // Send data to Google Apps Script (no-cors required for Apps Script)
+      await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify(formData),
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          submittedAt: new Date().toISOString(),
+        }),
       });
 
-      if (response.ok) {
-        toast.success("Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.");
-        setFormData({
-          companyName: "", industrySector: "", websiteUrl: "", headquarters: "",
-          yearEstablished: "", companySize: "", contactName: "", jobTitle: "",
-          email: "", phone: "", alternativeContact: "", companyOverview: "",
-          keyProducts: "", targetSegments: "", partnershipObjectives: "",
-          integrationModel: "", expectedValue: "", comments: "",
-        });
-      } else {
-        throw new Error("Submission failed");
-      }
+      // With no-cors we can't read response, but if no error thrown, assume success
+      toast.success("Partnership application submitted successfully! Our team will review and contact you within 5-7 business days.");
+      setFormData({
+        companyName: "", industrySector: "", websiteUrl: "", headquarters: "",
+        yearEstablished: "", companySize: "", contactName: "", jobTitle: "",
+        email: "", phone: "", alternativeContact: "", companyOverview: "",
+        keyProducts: "", targetSegments: "", partnershipObjectives: "",
+        integrationModel: "", expectedValue: "", comments: "",
+      });
     } catch (error) {
       console.error("Error submitting application:", error);
       toast.error("Failed to submit application. Please try again.");

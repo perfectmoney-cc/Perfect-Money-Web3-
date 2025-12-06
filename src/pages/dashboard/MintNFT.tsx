@@ -194,12 +194,12 @@ const MintNFTPage = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Art">PM Digital Card</SelectItem>
-                    <SelectItem value="Collectibles">PM Voucher Card </SelectItem>
-                    <SelectItem value="Music">PM Gift Cards</SelectItem>
-                    <SelectItem value="Photography">PM Partner Badge</SelectItem>
-                    <SelectItem value="Gaming">PM Discount Card</SelectItem>
-                    <SelectItem value="Utility">PM VIP Exclusive Card </SelectItem>
+                    <SelectItem value="PM Digital Card">PM Digital Card</SelectItem>
+                    <SelectItem value="PM Voucher Card">PM Voucher Card</SelectItem>
+                    <SelectItem value="PM Gift Cards">PM Gift Cards</SelectItem>
+                    <SelectItem value="PM Partner Badge">PM Partner Badge</SelectItem>
+                    <SelectItem value="PM Discount Card">PM Discount Card</SelectItem>
+                    <SelectItem value="PM VIP Exclusive Card">PM VIP Exclusive Card</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
