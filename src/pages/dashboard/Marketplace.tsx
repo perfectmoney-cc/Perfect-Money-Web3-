@@ -329,6 +329,27 @@ const MarketplacePage = () => {
     return `${hours}h ${mins}m`;
   };
 
+  // Analytics data
+  const analyticsData = {
+    totalVolume: 125420,
+    totalSales: 1847,
+    floorPrice: 85,
+    owners: 342,
+    listed: allMarketItems.length,
+  };
+
+  // Top minters leaderboard
+  const topMinters = [
+    { rank: 1, address: "0x742d...5f0b", minted: 47, volume: 12500, avatar: "🎨" },
+    { rank: 2, address: "0x8a3e...2c1d", minted: 38, volume: 9800, avatar: "🔥" },
+    { rank: 3, address: "0x1f4b...9e7a", minted: 31, volume: 7650, avatar: "⭐" },
+    { rank: 4, address: "0x5c2d...3f8e", minted: 26, volume: 5420, avatar: "💎" },
+    { rank: 5, address: "0x9b7a...4d2c", minted: 22, volume: 4180, avatar: "🚀" },
+  ];
+
+  // Trending NFTs (top 4 by views)
+  const trendingNFTs = [...allMarketItems].sort((a, b) => b.views - a.views).slice(0, 4);
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
       <Header />
@@ -351,7 +372,115 @@ const MarketplacePage = () => {
           </Button>
         </div>
 
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
+          {/* Collection Analytics */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold">Collection Analytics</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-primary">{analyticsData.totalVolume.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Volume (PM)</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-green-500">{analyticsData.totalSales.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Sales</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-yellow-500">{analyticsData.floorPrice}</p>
+                <p className="text-xs text-muted-foreground">Floor Price (PM)</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-blue-500">{analyticsData.owners}</p>
+                <p className="text-xs text-muted-foreground">Unique Owners</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold text-purple-500">{analyticsData.listed}</p>
+                <p className="text-xs text-muted-foreground">Listed Items</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Trending NFTs Section */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+              <h2 className="text-lg font-bold">Trending NFTs</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {trendingNFTs.map((item, index) => (
+                <Card 
+                  key={`trending-${item.id}`} 
+                  className="overflow-hidden hover:shadow-glow transition-all cursor-pointer border-2 border-yellow-500/20 hover:border-yellow-500/50"
+                  onClick={() => handleViewDetails(item)}
+                >
+                  <div className="aspect-square bg-muted/50 relative flex items-center justify-center">
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="h-12 w-12 text-muted-foreground" />
+                    )}
+                    <Badge className="absolute top-2 left-2 bg-yellow-500 text-black">
+                      #{index + 1} Trending
+                    </Badge>
+                    <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
+                      <Eye className="h-3 w-3" />
+                      <span className="text-xs">{item.views}</span>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-bold text-sm truncate">{item.name}</h3>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-primary font-bold text-sm">{item.price} PM</span>
+                      <span className="text-xs text-muted-foreground">{item.category}</span>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Minters Leaderboard */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <User className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-bold">Top Minters Leaderboard</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-muted-foreground border-b border-border">
+                    <th className="pb-3 pr-4">Rank</th>
+                    <th className="pb-3 pr-4">Minter</th>
+                    <th className="pb-3 pr-4 text-center">NFTs Minted</th>
+                    <th className="pb-3 text-right">Total Volume (PM)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topMinters.map((minter) => (
+                    <tr key={minter.rank} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-3 pr-4">
+                        <span className={`font-bold ${minter.rank === 1 ? 'text-yellow-500' : minter.rank === 2 ? 'text-gray-400' : minter.rank === 3 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                          #{minter.rank}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{minter.avatar}</span>
+                          <span className="font-mono text-sm">{minter.address}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-center font-semibold">{minter.minted}</td>
+                      <td className="py-3 text-right font-bold text-primary">{minter.volume.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
           <Tabs defaultValue="browse" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="browse">Browse Marketplace</TabsTrigger>

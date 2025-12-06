@@ -145,6 +145,9 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
     }
 
     try {
+      // Use the new PM token icon in public folder
+      const tokenImageUrl = `${window.location.origin}/pm-token-icon.png`;
+      
       const wasAdded = await ethereum.request({
         method: "wallet_watchAsset",
         params: {
@@ -153,7 +156,7 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
             address: tokenAddress,
             symbol: "PM",
             decimals: 18,
-            image: `${window.location.origin}/pm-token-logo.png`,
+            image: tokenImageUrl,
           },
         },
       });
