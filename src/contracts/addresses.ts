@@ -6,7 +6,7 @@ export const CONTRACT_ADDRESSES = {
   56: {
     PMToken: "0x181108f76d9910569203b5d59eb14Bc31961a989",
     PMPresale: "0xE23E0Bf6a999Ed0a9B676c0fA57e2e0b670E6986", // Deploy and update
-    PMAirdrop: "0xD642b123C048597D7A092187FA35f0De5F7Cb5ec", // Deploy and update
+    PMAirdrop: "0xe1CD60d9A7bEDac04dd5c489fFedAc168e162b03", // Deploy and update
     PMStaking: "0xf13F098EA32758c234C58e00aFeaFb790696787a", // Deploy and update
     PMSwap: "0x0DE5d903a94fbd9DDdb36b1D07995Fe3D777C69c", // Deploy and update
     PMTokenSender: "0xDF51425A2Cf93426B5dA40eCa66cB7a698028eBD", // Deploy and update
