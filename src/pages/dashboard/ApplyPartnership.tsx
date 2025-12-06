@@ -54,7 +54,12 @@ const ApplyPartnership = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Google Apps Script web app URL for form submission
+  // Google Sheets URL for direct submission via Google Forms/Apps Script
+  // This uses the Google Sheets web API to append data directly
+  const GOOGLE_SHEETS_URL =
+    "https://docs.google.com/spreadsheets/d/1ykn3YfnCNlb8iRn3Uli3VvI3Ij0iTMc1vilGYogeZX4/edit";
+  
+  // Google Apps Script web app URL for form submission (handles the actual data submission)
   const GOOGLE_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycby0ZANQc9fm1140WSIUhb236USEAkI738TSm__2gV53jcoxcomeM_R9jsFXk4RFQlnDQg/exec";
 
@@ -64,15 +69,35 @@ const ApplyPartnership = () => {
     setIsSubmitting(true);
 
     try {
-      // Send data to Google Apps Script (no-cors required for Apps Script)
+      // Prepare form data for Google Sheets (ordered to match spreadsheet columns)
+      const rowData = {
+        timestamp: new Date().toISOString(),
+        companyName: formData.companyName,
+        industrySector: formData.industrySector,
+        websiteUrl: formData.websiteUrl,
+        headquarters: formData.headquarters,
+        yearEstablished: formData.yearEstablished,
+        companySize: formData.companySize,
+        contactName: formData.contactName,
+        jobTitle: formData.jobTitle,
+        email: formData.email,
+        phone: formData.phone,
+        alternativeContact: formData.alternativeContact,
+        companyOverview: formData.companyOverview,
+        keyProducts: formData.keyProducts,
+        targetSegments: formData.targetSegments,
+        partnershipObjectives: formData.partnershipObjectives,
+        integrationModel: formData.integrationModel,
+        expectedValue: formData.expectedValue,
+        comments: formData.comments,
+      };
+
+      // Send data to Google Apps Script which will append to Google Sheets
       await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          submittedAt: new Date().toISOString(),
-        }),
+        body: JSON.stringify(rowData),
       });
 
       // With no-cors we can't read response, but if no error thrown, assume success

@@ -10,13 +10,21 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
-import { ArrowLeft, Upload, Image, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Upload, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useAccount } from "wagmi";
+import { useNFTMarketplace, useTokenApproval, useNFTStats } from "@/hooks/useNFTMarketplace";
+import { formatEther, parseEther } from "viem";
 import pmLogo from "@/assets/pm-logo-new.png";
 
 const MintNFTPage = () => {
   const navigate = useNavigate();
+  const { address, isConnected } = useAccount();
+  const { mintNFT } = useNFTMarketplace();
+  const { balance, allowance } = useTokenApproval();
+  const { mintingFee: contractMintingFee } = useNFTStats();
+  
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -24,8 +32,11 @@ const MintNFTPage = () => {
   const [royalty, setRoyalty] = useState("5");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
+  const [approvalStep, setApprovalStep] = useState<"idle" | "approving" | "minting">("idle");
 
-  const mintingFee = 10000; // PM tokens
+  const mintingFee = contractMintingFee ? parseFloat(contractMintingFee) : 10000;
+  const hasEnoughBalance = balance ? parseFloat(formatEther(balance)) >= mintingFee : false;
+  const hasApproval = allowance ? allowance >= parseEther(mintingFee.toString()) : false;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,69 +55,73 @@ const MintNFTPage = () => {
       return;
     }
 
-    const pmBalance = parseFloat(localStorage.getItem("pmBalance") || "0");
-    if (pmBalance < mintingFee) {
-      toast.error(`Insufficient PM balance. Need ${mintingFee} PM for minting fee`);
+    if (!isConnected || !address) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    if (!hasEnoughBalance) {
+      toast.error(`Insufficient PM balance. Need ${mintingFee.toLocaleString()} PM for minting fee`);
       return;
     }
 
     setIsMinting(true);
 
-    // Simulate minting process
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Create token URI (in production, this would upload to IPFS)
+      const tokenURI = `data:application/json;base64,${btoa(JSON.stringify({
+        name,
+        description,
+        image: imagePreview || "",
+        category,
+        attributes: [
+          { trait_type: "Category", value: category },
+          { trait_type: "Royalty", value: `${royalty}%` },
+          { trait_type: "Price", value: `${price} PM` }
+        ]
+      }))}`;
 
-    // Create minted NFT
-    const mintedNFT = {
-      id: Date.now(),
-      name,
-      description,
-      category,
-      price: parseFloat(price),
-      royalty: parseFloat(royalty),
-      image: imagePreview,
-      creator: localStorage.getItem("connectedWallet") || "0x742d35...5f0bEb",
-      mintedAt: new Date().toISOString(),
-      isListed: true,
-      isAuction: false,
-    };
+      // Call blockchain mint function (handles approval internally)
+      await mintNFT(tokenURI, name, description, category, parseFloat(royalty));
 
-    // Save to marketplace items
-    const marketplaceItems = JSON.parse(localStorage.getItem("mintedNFTs") || "[]");
-    marketplaceItems.push(mintedNFT);
-    localStorage.setItem("mintedNFTs", JSON.stringify(marketplaceItems));
+      // Also save to localStorage for UI display
+      const mintedNFT = {
+        id: Date.now(),
+        name,
+        description,
+        category,
+        price: parseFloat(price),
+        royalty: parseFloat(royalty),
+        image: imagePreview,
+        creator: address,
+        mintedAt: new Date().toISOString(),
+        isListed: true,
+        isAuction: false,
+      };
 
-    // Also add to owned NFTs
-    const ownedNFTs = JSON.parse(localStorage.getItem("ownedNFTs") || "[]");
-    ownedNFTs.push({
-      id: mintedNFT.id,
-      name: mintedNFT.name,
-      purchasePrice: 0,
-      category: mintedNFT.category,
-      description: mintedNFT.description,
-      image: mintedNFT.image,
-      isMinted: true,
-    });
-    localStorage.setItem("ownedNFTs", JSON.stringify(ownedNFTs));
+      const marketplaceItems = JSON.parse(localStorage.getItem("mintedNFTs") || "[]");
+      marketplaceItems.push(mintedNFT);
+      localStorage.setItem("mintedNFTs", JSON.stringify(marketplaceItems));
 
-    // Deduct minting fee
-    const newBalance = pmBalance - mintingFee;
-    localStorage.setItem("pmBalance", newBalance.toFixed(2));
-    window.dispatchEvent(new Event("balanceUpdate"));
+      const ownedNFTs = JSON.parse(localStorage.getItem("ownedNFTs") || "[]");
+      ownedNFTs.push({
+        id: mintedNFT.id,
+        name: mintedNFT.name,
+        purchasePrice: 0,
+        category: mintedNFT.category,
+        description: mintedNFT.description,
+        image: mintedNFT.image,
+        isMinted: true,
+      });
+      localStorage.setItem("ownedNFTs", JSON.stringify(ownedNFTs));
 
-    // Log transaction
-    const transactions = JSON.parse(localStorage.getItem("recentTransactions") || "[]");
-    transactions.unshift({
-      id: Date.now(),
-      description: `Minted NFT: ${name}`,
-      amount: -mintingFee,
-      time: "Just now",
-      type: "debit",
-    });
-    localStorage.setItem("recentTransactions", JSON.stringify(transactions));
-
-    setIsMinting(false);
-    toast.success("NFT minted successfully!");
-    navigate("/dashboard/marketplace");
+      window.dispatchEvent(new Event("balanceUpdate"));
+      navigate("/dashboard/marketplace");
+    } catch (error: any) {
+      console.error("Minting error:", error);
+    } finally {
+      setIsMinting(false);
+    }
   };
 
   return (
@@ -241,15 +256,51 @@ const MintNFTPage = () => {
               </div>
 
               {/* Minting Fee Info */}
-              <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+              <div className="p-4 rounded-lg bg-muted/50 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Minting Fee</span>
                   <div className="flex items-center gap-1">
-                    <span className="font-medium">{mintingFee}</span>
+                    <span className="font-medium">{mintingFee.toLocaleString()}</span>
                     <img src={pmLogo} alt="PM" className="h-4 w-4" />
                     <span className="font-medium">PM</span>
                   </div>
                 </div>
+                
+                {/* Wallet Balance */}
+                {isConnected && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Your Balance</span>
+                    <div className="flex items-center gap-1">
+                      <span className={`font-medium ${hasEnoughBalance ? 'text-green-500' : 'text-destructive'}`}>
+                        {balance ? parseFloat(formatEther(balance)).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '0'}
+                      </span>
+                      <img src={pmLogo} alt="PM" className="h-4 w-4" />
+                      <span className="font-medium">PM</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Approval Status */}
+                {isConnected && (
+                  <div className="flex items-start gap-2 pt-2 border-t border-border">
+                    {hasApproval ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-green-600">
+                          PM tokens approved for minting
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-muted-foreground">
+                          Token approval required before minting (one-time step)
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-start gap-2 pt-2 border-t border-border">
                   <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground">
@@ -258,22 +309,30 @@ const MintNFTPage = () => {
                 </div>
               </div>
 
+              {/* Connection Warning */}
+              {!isConnected && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <p className="text-sm text-amber-600">Please connect your wallet to mint NFTs</p>
+                </div>
+              )}
+
               {/* Mint Button */}
               <Button
                 variant="gradient"
                 className="w-full"
                 onClick={handleMint}
-                disabled={isMinting || !name || !description || !category || !price}
+                disabled={isMinting || !name || !description || !category || !price || !isConnected || !hasEnoughBalance}
               >
                 {isMinting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                    Minting...
+                    {!hasApproval ? "Approving & Minting..." : "Minting..."}
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Mint NFT for {mintingFee} PM
+                    {!hasApproval ? `Approve & Mint for ${mintingFee.toLocaleString()} PM` : `Mint NFT for ${mintingFee.toLocaleString()} PM`}
                   </>
                 )}
               </Button>

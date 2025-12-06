@@ -1,9 +1,12 @@
 import { useReadContract, useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { PMNFTABI } from '@/contracts/nftABI';
-import { getContractAddress } from '@/contracts/addresses';
-import { parseEther, formatEther } from 'viem';
+import { PMTokenABI } from '@/contracts/abis';
+import { getContractAddress, PM_TOKEN_ADDRESS } from '@/contracts/addresses';
+import { parseEther, formatEther, maxUint256 } from 'viem';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+
+const PMTOKEN_ADDRESS = PM_TOKEN_ADDRESS as `0x${string}`;
 
 const PMNFT_ADDRESS = getContractAddress(56, 'PMNFT') as `0x${string}`;
 
@@ -113,9 +116,77 @@ export function useUserNFTs(address: `0x${string}` | undefined) {
   };
 }
 
+export function useTokenApproval() {
+  const { address } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: PMTOKEN_ADDRESS,
+    abi: PMTokenABI,
+    functionName: 'allowance',
+    args: address ? [address, PMNFT_ADDRESS] : undefined,
+  });
+
+  const { data: balance, refetch: refetchBalance } = useReadContract({
+    address: PMTOKEN_ADDRESS,
+    abi: PMTokenABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+  });
+
+  const checkAllowance = (requiredAmount: bigint): boolean => {
+    if (!allowance) return false;
+    return (allowance as bigint) >= requiredAmount;
+  };
+
+  const approvePMToken = async (amount: bigint) => {
+    if (!address) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+    
+    try {
+      toast.info('Approving PM tokens...');
+      const hash = await writeContractAsync({
+        address: PMTOKEN_ADDRESS,
+        abi: PMTokenABI,
+        functionName: 'approve',
+        args: [PMNFT_ADDRESS, amount],
+      } as any);
+      toast.success('PM tokens approved!');
+      await refetchAllowance();
+      return hash;
+    } catch (error: any) {
+      toast.error(error?.message || 'Approval failed');
+      throw error;
+    }
+  };
+
+  const approveMaxPMToken = async () => {
+    return approvePMToken(maxUint256);
+  };
+
+  return {
+    allowance: allowance as bigint | undefined,
+    balance: balance as bigint | undefined,
+    checkAllowance,
+    approvePMToken,
+    approveMaxPMToken,
+    refetchAllowance,
+    refetchBalance,
+  };
+}
+
 export function useNFTMarketplace() {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const { approvePMToken, checkAllowance, refetchAllowance } = useTokenApproval();
+
+  const { data: mintingFee } = useReadContract({
+    address: PMNFT_ADDRESS,
+    abi: PMNFTABI,
+    functionName: 'mintingFee',
+  });
 
   const mintNFT = async (
     tokenURI: string,
@@ -130,6 +201,16 @@ export function useNFTMarketplace() {
     }
     
     try {
+      const fee = mintingFee as bigint || parseEther('10000');
+      
+      // Check if approval is needed
+      if (!checkAllowance(fee)) {
+        toast.info('Step 1/2: Approving PM tokens for minting fee...');
+        await approvePMToken(fee);
+        await refetchAllowance();
+      }
+
+      toast.info('Step 2/2: Minting NFT...');
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
