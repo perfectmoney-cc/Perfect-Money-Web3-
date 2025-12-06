@@ -196,50 +196,35 @@ const AirdropPage = () => {
     minutes: 0,
     seconds: 0
   });
+  const [prevTimeLeft, setPrevTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  // 90 days countdown starting from December 6, 2025
+  const AIRDROP_START_DATE = new Date('2025-12-06T00:00:00Z');
+  const AIRDROP_END_DATE = new Date(AIRDROP_START_DATE.getTime() + 90 * 24 * 60 * 60 * 1000);
 
   useEffect(() => {
-    if (!endTime || !isContractDeployed) {
-      // Fallback countdown
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() + 45);
-      
-      const timer = setInterval(() => {
-        const now = new Date().getTime();
-        const distance = targetDate.getTime() - now;
-        if (distance < 0) {
-          clearInterval(timer);
-          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-          return;
-        }
-        setTimeLeft({
-          days: Math.floor(distance / (1000 * 60 * 60 * 24)),
-          hours: Math.floor(distance % (1000 * 60 * 60 * 24) / (1000 * 60 * 60)),
-          minutes: Math.floor(distance % (1000 * 60 * 60) / (1000 * 60)),
-          seconds: Math.floor(distance % (1000 * 60) / 1000)
-        });
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-
-    // Use contract end time
-    const endTimeMs = Number(endTime) * 1000;
     const timer = setInterval(() => {
       const now = Date.now();
-      const distance = endTimeMs - now;
+      const distance = AIRDROP_END_DATE.getTime() - now;
+      
       if (distance < 0) {
         clearInterval(timer);
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
         return;
       }
-      setTimeLeft({
+      
+      const newTimeLeft = {
         days: Math.floor(distance / (1000 * 60 * 60 * 24)),
         hours: Math.floor(distance % (1000 * 60 * 60 * 24) / (1000 * 60 * 60)),
         minutes: Math.floor(distance % (1000 * 60 * 60) / (1000 * 60)),
         seconds: Math.floor(distance % (1000 * 60) / 1000)
-      });
+      };
+      
+      setPrevTimeLeft(timeLeft);
+      setTimeLeft(newTimeLeft);
     }, 1000);
     return () => clearInterval(timer);
-  }, [endTime, isContractDeployed]);
+  }, [timeLeft]);
 
   // Social tasks
   const [tasks, setTasks] = useState([
@@ -465,33 +450,42 @@ const AirdropPage = () => {
                 </p>
               </div>
               
-              <Card className="p-4 md:p-6 bg-background/80 backdrop-blur-sm">
+              <Card className="p-4 md:p-6 bg-background/80 backdrop-blur-sm border-primary/30 shadow-lg shadow-primary/10">
                 <div className="text-center mb-4">
-                  <Clock className="h-5 md:h-6 w-5 md:w-6 text-primary mx-auto mb-2" />
+                  <Clock className="h-5 md:h-6 w-5 md:w-6 text-primary mx-auto mb-2 animate-pulse" />
                   <p className="text-xs md:text-sm text-muted-foreground font-medium">Time Remaining</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">90 Day Airdrop Event</p>
                 </div>
                 <div className="grid grid-cols-4 gap-2 md:gap-3">
-                  <div className="text-center">
-                    <div className="bg-primary/10 rounded-lg p-2 md:p-3 mb-1">
-                      <span className="text-xl md:text-2xl font-bold">{timeLeft.days}</span>
+                  <div className="text-center group">
+                    <div className={`bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg p-2 md:p-3 mb-1 border border-primary/20 transition-all duration-300 ${prevTimeLeft.days !== timeLeft.days ? 'animate-scale-in' : ''}`}>
+                      <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                        {String(timeLeft.days).padStart(2, '0')}
+                      </span>
                     </div>
                     <span className="text-xs text-muted-foreground">Days</span>
                   </div>
-                  <div className="text-center">
-                    <div className="bg-primary/10 rounded-lg p-2 md:p-3 mb-1">
-                      <span className="text-xl md:text-2xl font-bold">{timeLeft.hours}</span>
+                  <div className="text-center group">
+                    <div className={`bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg p-2 md:p-3 mb-1 border border-primary/20 transition-all duration-300 ${prevTimeLeft.hours !== timeLeft.hours ? 'animate-scale-in' : ''}`}>
+                      <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                        {String(timeLeft.hours).padStart(2, '0')}
+                      </span>
                     </div>
                     <span className="text-xs text-muted-foreground">Hours</span>
                   </div>
-                  <div className="text-center">
-                    <div className="bg-primary/10 rounded-lg p-2 md:p-3 mb-1">
-                      <span className="text-xl md:text-2xl font-bold">{timeLeft.minutes}</span>
+                  <div className="text-center group">
+                    <div className={`bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg p-2 md:p-3 mb-1 border border-primary/20 transition-all duration-300 ${prevTimeLeft.minutes !== timeLeft.minutes ? 'animate-scale-in' : ''}`}>
+                      <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                        {String(timeLeft.minutes).padStart(2, '0')}
+                      </span>
                     </div>
                     <span className="text-xs text-muted-foreground">Mins</span>
                   </div>
-                  <div className="text-center">
-                    <div className="bg-primary/10 rounded-lg p-2 md:p-3 mb-1">
-                      <span className="text-xl md:text-2xl font-bold">{timeLeft.seconds}</span>
+                  <div className="text-center group">
+                    <div className={`bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg p-2 md:p-3 mb-1 border border-primary/20 transition-all duration-300 ${prevTimeLeft.seconds !== timeLeft.seconds ? 'animate-scale-in' : ''}`}>
+                      <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                        {String(timeLeft.seconds).padStart(2, '0')}
+                      </span>
                     </div>
                     <span className="text-xs text-muted-foreground">Secs</span>
                   </div>
@@ -521,31 +515,46 @@ const AirdropPage = () => {
               </div>
               
               <div className="space-y-3">
-                {tasks.map(task => {
+                {tasks.map((task, index) => {
                   const Icon = task.icon;
                   const isLoading = isPending && !task.completed;
                   return (
-                    <div key={task.id} className={`flex items-center justify-between p-3 md:p-4 border rounded-lg transition-all ${task.completed ? 'border-green-500/50 bg-green-500/5' : 'border-border hover:border-primary/50'}`}>
+                    <div 
+                      key={task.id} 
+                      className={`flex items-center justify-between p-3 md:p-4 border rounded-lg transition-all duration-300 hover:scale-[1.01] ${
+                        task.completed 
+                          ? 'border-green-500/50 bg-gradient-to-r from-green-500/10 to-green-500/5 animate-fade-in' 
+                          : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                      }`}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
                       <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
                         {task.completed ? (
-                          <CheckCircle className="h-4 md:h-5 w-4 md:w-5 text-green-500 flex-shrink-0" />
+                          <CheckCircle className="h-4 md:h-5 w-4 md:w-5 text-green-500 flex-shrink-0 animate-scale-in" />
                         ) : (
-                          <div className="h-4 md:h-5 w-4 md:w-5 rounded-full border-2 border-muted flex-shrink-0" />
+                          <div className="h-4 md:h-5 w-4 md:w-5 rounded-full border-2 border-muted flex-shrink-0 transition-all hover:border-primary" />
                         )}
-                        <Icon className={`h-4 md:h-5 w-4 md:w-5 flex-shrink-0 ${task.color}`} />
-                        <span className="font-medium text-xs md:text-sm truncate">{task.title}</span>
+                        <Icon className={`h-4 md:h-5 w-4 md:w-5 flex-shrink-0 ${task.color} transition-transform hover:scale-110`} />
+                        <span className={`font-medium text-xs md:text-sm truncate ${task.completed ? 'text-green-500' : ''}`}>{task.title}</span>
                       </div>
                       <Button 
                         variant={task.completed ? "ghost" : "outline"} 
                         size="sm" 
                         onClick={() => handleTaskClaim(task.id, task.link)} 
                         disabled={task.completed || isLoading}
-                        className="flex-shrink-0 text-xs md:text-sm"
+                        className={`flex-shrink-0 text-xs md:text-sm transition-all duration-200 ${
+                          task.completed 
+                            ? 'text-green-500 bg-green-500/10' 
+                            : 'hover:bg-primary hover:text-primary-foreground'
+                        }`}
                       >
                         {isLoading ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : task.completed ? (
-                          "Done"
+                          <>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Done
+                          </>
                         ) : (
                           <>
                             Claim <ExternalLink className="h-3 w-3 ml-1" />
@@ -557,22 +566,33 @@ const AirdropPage = () => {
                 })}
               </div>
               
-              <div className="mt-4 md:mt-6 p-3 md:p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="mt-4 md:mt-6 p-3 md:p-4 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-lg">
                 <div className="flex items-center justify-between">
                   <span className="text-xs md:text-sm font-medium">Progress</span>
-                  <span className="text-xs md:text-sm font-bold">
+                  <span className="text-xs md:text-sm font-bold text-primary">
                     {completedCount} / {tasks.length}
                   </span>
                 </div>
-                <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+                <div className="mt-2 h-3 bg-muted/50 rounded-full overflow-hidden border border-border/50">
                   <div 
-                    className="h-full bg-primary transition-all duration-300" 
-                    style={{ width: `${(completedCount / tasks.length) * 100}%` }} 
-                  />
+                    className="h-full bg-gradient-to-r from-primary to-green-500 transition-all duration-500 ease-out relative"
+                    style={{ width: `${(completedCount / tasks.length) * 100}%` }}
+                  >
+                    {completedCount > 0 && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Earned: <span className="font-bold text-primary">{Number(userClaimedFormatted).toLocaleString()} PM</span>
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Earned: <span className="font-bold text-primary">{Number(userClaimedFormatted).toLocaleString()} PM</span>
+                  </p>
+                  {allTasksCompleted && (
+                    <span className="text-xs text-green-500 font-medium animate-fade-in flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" /> All Complete!
+                    </span>
+                  )}
+                </div>
               </div>
             </Card>
 
