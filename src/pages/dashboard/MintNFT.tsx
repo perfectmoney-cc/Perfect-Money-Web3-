@@ -25,7 +25,7 @@ const MintNFTPage = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
 
-  const mintingFee = 50; // PM tokens
+  const mintingFee = 10000; // PM tokens
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,7 +53,7 @@ const MintNFTPage = () => {
     setIsMinting(true);
 
     // Simulate minting process
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Create minted NFT
     const mintedNFT = {
@@ -120,7 +120,10 @@ const MintNFTPage = () => {
           <WalletCard showQuickFunctionsToggle={false} compact={true} />
         </div>
 
-        <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm"
+        >
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard
         </Link>
@@ -169,11 +172,7 @@ const MintNFTPage = () => {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium mb-2">Name *</label>
-                <Input
-                  placeholder="Enter NFT name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <Input placeholder="Enter NFT name" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
 
               {/* Description */}
@@ -195,12 +194,12 @@ const MintNFTPage = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Art">Art</SelectItem>
-                    <SelectItem value="Collectibles">Collectibles</SelectItem>
-                    <SelectItem value="Music">Music</SelectItem>
-                    <SelectItem value="Photography">Photography</SelectItem>
-                    <SelectItem value="Gaming">Gaming</SelectItem>
-                    <SelectItem value="Utility">Utility</SelectItem>
+                    <SelectItem value="Art">PM Digital Card</SelectItem>
+                    <SelectItem value="Collectibles">PM Voucher Card </SelectItem>
+                    <SelectItem value="Music">PM Gift Cards</SelectItem>
+                    <SelectItem value="Photography">PM Partner Badge</SelectItem>
+                    <SelectItem value="Gaming">PM Discount Card</SelectItem>
+                    <SelectItem value="Utility">PM VIP Exclusive Card </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -238,9 +237,7 @@ const MintNFTPage = () => {
                     <SelectItem value="10">10%</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Earn royalties on every secondary sale
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">Earn royalties on every secondary sale</p>
               </div>
 
               {/* Minting Fee Info */}
