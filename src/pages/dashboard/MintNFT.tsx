@@ -10,13 +10,14 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
-import { ArrowLeft, Upload, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Upload, Sparkles, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount } from "wagmi";
 import { useNFTMarketplace, useTokenApproval, useNFTStats } from "@/hooks/useNFTMarketplace";
 import { formatEther, parseEther } from "viem";
 import pmLogo from "@/assets/pm-logo-new.png";
+import { uploadToIPFS, ipfsToHttp } from "@/utils/ipfsService";
 
 const MintNFTPage = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const MintNFTPage = () => {
   const [royalty, setRoyalty] = useState("5");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
+  const [isUploadingToIPFS, setIsUploadingToIPFS] = useState(false);
   const [approvalStep, setApprovalStep] = useState<"idle" | "approving" | "minting">("idle");
 
   const mintingFee = contractMintingFee ? parseFloat(contractMintingFee) : 10000;
@@ -68,18 +70,53 @@ const MintNFTPage = () => {
     setIsMinting(true);
 
     try {
-      // Create token URI (in production, this would upload to IPFS)
-      const tokenURI = `data:application/json;base64,${btoa(JSON.stringify({
-        name,
-        description,
-        image: imagePreview || "",
-        category,
-        attributes: [
-          { trait_type: "Category", value: category },
-          { trait_type: "Royalty", value: `${royalty}%` },
-          { trait_type: "Price", value: `${price} PM` }
-        ]
-      }))}`;
+      let tokenURI: string;
+      let ipfsImageUri: string | undefined;
+
+      // Upload to IPFS if there's an image
+      if (imagePreview) {
+        setIsUploadingToIPFS(true);
+        toast.info("Uploading to IPFS...");
+        
+        const ipfsResult = await uploadToIPFS(imagePreview, {
+          name,
+          description,
+          category,
+          royalty: parseFloat(royalty),
+          price: parseFloat(price),
+          creator: address,
+          attributes: [
+            { trait_type: "Category", value: category },
+            { trait_type: "Royalty", value: `${royalty}%` },
+            { trait_type: "Price", value: `${price} PM` }
+          ]
+        });
+
+        setIsUploadingToIPFS(false);
+
+        if (!ipfsResult.success) {
+          toast.error(ipfsResult.error || "Failed to upload to IPFS");
+          setIsMinting(false);
+          return;
+        }
+
+        tokenURI = ipfsResult.tokenUri!;
+        ipfsImageUri = ipfsResult.imageUri;
+        toast.success("Uploaded to IPFS successfully!");
+      } else {
+        // Fallback to base64 if no image
+        tokenURI = `data:application/json;base64,${btoa(JSON.stringify({
+          name,
+          description,
+          image: "",
+          category,
+          attributes: [
+            { trait_type: "Category", value: category },
+            { trait_type: "Royalty", value: `${royalty}%` },
+            { trait_type: "Price", value: `${price} PM` }
+          ]
+        }))}`;
+      }
 
       // Call blockchain mint function (handles approval internally)
       await mintNFT(tokenURI, name, description, category, parseFloat(royalty));
@@ -92,7 +129,7 @@ const MintNFTPage = () => {
         category,
         price: parseFloat(price),
         royalty: parseFloat(royalty),
-        image: imagePreview,
+        image: ipfsImageUri || imagePreview, // Use IPFS URI if available
         creator: address,
         mintedAt: new Date().toISOString(),
         isListed: true,
@@ -121,6 +158,7 @@ const MintNFTPage = () => {
       console.error("Minting error:", error);
     } finally {
       setIsMinting(false);
+      setIsUploadingToIPFS(false);
     }
   };
 
@@ -326,8 +364,12 @@ const MintNFTPage = () => {
               >
                 {isMinting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                    {!hasApproval ? "Approving & Minting..." : "Minting..."}
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {isUploadingToIPFS 
+                      ? "Uploading to IPFS..." 
+                      : !hasApproval 
+                        ? "Approving & Minting..." 
+                        : "Minting..."}
                   </>
                 ) : (
                   <>
