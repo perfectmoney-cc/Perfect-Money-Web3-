@@ -225,13 +225,32 @@ export function useNFTMarketplace() {
     }
   };
 
-  const buyNFT = async (tokenId: number) => {
+  const buyNFT = async (tokenId: number, price: bigint) => {
     if (!address) {
       toast.error('Please connect your wallet');
       return;
     }
     
     try {
+      // Check if approval is needed for the NFT price
+      const { data: allowance } = await useReadContractAsync({
+        address: PMTOKEN_ADDRESS,
+        abi: PMTokenABI,
+        functionName: 'allowance',
+        args: [address, PMNFT_ADDRESS],
+      });
+
+      if (!allowance || (allowance as bigint) < price) {
+        toast.info('Step 1/2: Approving PM tokens for purchase...');
+        await writeContractAsync({
+          address: PMTOKEN_ADDRESS,
+          abi: PMTokenABI,
+          functionName: 'approve',
+          args: [PMNFT_ADDRESS, price],
+        } as any);
+      }
+
+      toast.info('Step 2/2: Completing purchase...');
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
@@ -242,6 +261,74 @@ export function useNFTMarketplace() {
       return hash;
     } catch (error: any) {
       toast.error(error?.message || 'Purchase failed');
+      throw error;
+    }
+  };
+
+  const buyNFTWithApproval = async (tokenId: number, priceInPM: string) => {
+    if (!address) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+    
+    try {
+      const price = parseEther(priceInPM);
+      
+      // First approve the tokens
+      toast.info('Step 1/2: Approving PM tokens for purchase...');
+      await writeContractAsync({
+        address: PMTOKEN_ADDRESS,
+        abi: PMTokenABI,
+        functionName: 'approve',
+        args: [PMNFT_ADDRESS, price],
+      } as any);
+
+      // Then buy the NFT
+      toast.info('Step 2/2: Completing purchase...');
+      const hash = await writeContractAsync({
+        address: PMNFT_ADDRESS,
+        abi: PMNFTABI,
+        functionName: 'buy',
+        args: [BigInt(tokenId)],
+      } as any);
+      toast.success('NFT purchased successfully!');
+      return hash;
+    } catch (error: any) {
+      toast.error(error?.message || 'Purchase failed');
+      throw error;
+    }
+  };
+
+  const placeBidWithApproval = async (tokenId: number, bidAmount: string) => {
+    if (!address) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+    
+    try {
+      const amount = parseEther(bidAmount);
+      
+      // First approve the tokens for the bid
+      toast.info('Step 1/2: Approving PM tokens for bid...');
+      await writeContractAsync({
+        address: PMTOKEN_ADDRESS,
+        abi: PMTokenABI,
+        functionName: 'approve',
+        args: [PMNFT_ADDRESS, amount],
+      } as any);
+
+      // Then place the bid
+      toast.info('Step 2/2: Placing bid...');
+      const hash = await writeContractAsync({
+        address: PMNFT_ADDRESS,
+        abi: PMNFTABI,
+        functionName: 'placeBid',
+        args: [BigInt(tokenId), amount],
+      } as any);
+      toast.success('Bid placed successfully!');
+      return hash;
+    } catch (error: any) {
+      toast.error(error?.message || 'Bid failed');
       throw error;
     }
   };
@@ -354,10 +441,13 @@ export function useNFTMarketplace() {
   return {
     mintNFT,
     buyNFT,
+    buyNFTWithApproval,
+    placeBidWithApproval,
     listForSale,
     listForAuction,
     placeBid,
     delistNFT,
     endAuction,
+    mintingFee: mintingFee as bigint | undefined,
   };
 }
