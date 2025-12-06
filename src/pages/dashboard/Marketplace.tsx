@@ -54,6 +54,7 @@ interface Bid {
 const MarketplacePage = () => {
   const navigate = useNavigate();
   const [sortBy, setSortBy] = useState("trending");
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState<MarketItem | null>(null);
   const [detailItem, setDetailItem] = useState<MarketItem | null>(null);
@@ -65,7 +66,7 @@ const MarketplacePage = () => {
   const [isAuctionListing, setIsAuctionListing] = useState(false);
   const [auctionDuration, setAuctionDuration] = useState("24");
   const [startingBid, setStartingBid] = useState("");
-  const itemsPerPage = 9;
+  const itemsPerPage = 12;
 
   // Load owned NFTs from localStorage
   useEffect(() => {
@@ -300,7 +301,14 @@ const MarketplacePage = () => {
     setIsAuctionListing(false);
   };
 
-  const sortedItems = [...allMarketItems].sort((a, b) => {
+  // Filter by search query
+  const filteredItems = allMarketItems.filter((item) =>
+    searchQuery.trim() === "" ||
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
     if (sortBy === "price-low") return a.price - b.price;
     if (sortBy === "price-high") return b.price - a.price;
     if (sortBy === "date") return b.date.getTime() - a.date.getTime();
@@ -363,6 +371,15 @@ const MarketplacePage = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                  <Input
+                    placeholder="Search NFTs..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-[200px]"
+                  />
                   <span className="text-sm text-muted-foreground">Sort by:</span>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-[180px]">
@@ -379,7 +396,7 @@ const MarketplacePage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {marketItems.map((item) => (
                   <Card key={item.id} className="overflow-hidden hover:shadow-glow transition-all group cursor-pointer" onClick={() => handleViewDetails(item)}>
                     <div className="aspect-square bg-muted/50 relative flex items-center justify-center">

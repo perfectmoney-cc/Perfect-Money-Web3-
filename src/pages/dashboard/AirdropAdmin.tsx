@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Header } from "@/components/Header";
 import { TradingViewTicker } from "@/components/TradingViewTicker";
 import { HeroBanner } from "@/components/HeroBanner";
@@ -18,53 +17,35 @@ import {
   Shield,
   AlertTriangle,
   Wallet,
-  Plus,
   Save,
-  Trash2,
-  RefreshCw
+  RefreshCw,
+  Coins,
+  BarChart3,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatUnits, parseUnits, formatEther } from 'viem';
-import { PMAirdropABI } from "@/contracts/swapABI";
+import { formatUnits, parseUnits, formatEther, parseEther } from 'viem';
+import { AIRDROP_ABI } from "@/contracts/airdropABI";
 import { CONTRACT_ADDRESSES } from "@/contracts/addresses";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 const PMAIRDROP_ADDRESS = CONTRACT_ADDRESSES[56].PMAirdrop as `0x${string}`;
 
-interface TaskConfig {
-  id: number;
-  name: string;
-  link: string;
-  reward: string;
-  enabled: boolean;
-}
-
 const AirdropAdminPage = () => {
   const { address, isConnected } = useAccount();
-  const [claimFee, setClaimFee] = useState("0.01");
-  const [networkFee, setNetworkFee] = useState("0.01");
+  const [claimFee, setClaimFee] = useState("0.0005");
+  const [networkFee, setNetworkFee] = useState("0.0005");
   const [feeCollectorAddress, setFeeCollectorAddress] = useState("");
   const [maxClaimableValue, setMaxClaimableValue] = useState("");
-  const [airdropDuration, setAirdropDuration] = useState("30");
-  const [tasks, setTasks] = useState<TaskConfig[]>([]);
-  const [newTask, setNewTask] = useState<TaskConfig>({ id: 0, name: "", link: "", reward: "100", enabled: true });
+  const [totalRewardValue, setTotalRewardValue] = useState("");
 
   const isContractDeployed = PMAIRDROP_ADDRESS !== "0x0000000000000000000000000000000000000000";
 
   // Read contract owner
   const { data: contractOwner } = useReadContract({
     address: PMAIRDROP_ADDRESS,
-    abi: PMAirdropABI,
+    abi: AIRDROP_ABI,
     functionName: 'owner',
     chainId: 56,
     query: { enabled: isContractDeployed }
@@ -72,38 +53,51 @@ const AirdropAdminPage = () => {
 
   const isOwner = address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase();
 
-  // Read admin info
-  const { data: adminInfo, refetch: refetchAdminInfo } = useReadContract({
+  // Read fees
+  const { data: claimFeeBNB, refetch: refetchClaimFee } = useReadContract({
     address: PMAIRDROP_ADDRESS,
-    abi: PMAirdropABI,
-    functionName: 'getAdminInfo',
+    abi: AIRDROP_ABI,
+    functionName: 'claimFeeBNB',
     chainId: 56,
     query: { enabled: isContractDeployed }
   });
 
-  // Read fee info
-  const { data: feeInfo, refetch: refetchFeeInfo } = useReadContract({
+  const { data: networkFeeBNB, refetch: refetchNetworkFee } = useReadContract({
     address: PMAIRDROP_ADDRESS,
-    abi: PMAirdropABI,
-    functionName: 'getFeeInfo',
+    abi: AIRDROP_ABI,
+    functionName: 'networkFeeBNB',
     chainId: 56,
     query: { enabled: isContractDeployed }
   });
 
-  // Read airdrop info
-  const { data: airdropInfo, refetch: refetchAirdropInfo } = useReadContract({
+  const { data: feeCollector, refetch: refetchFeeCollector } = useReadContract({
     address: PMAIRDROP_ADDRESS,
-    abi: PMAirdropABI,
-    functionName: 'getAirdropInfo',
+    abi: AIRDROP_ABI,
+    functionName: 'feeCollector',
     chainId: 56,
     query: { enabled: isContractDeployed }
   });
 
-  // Read all tasks
-  const { data: allTasks, refetch: refetchTasks } = useReadContract({
+  const { data: totalReward, refetch: refetchTotalReward } = useReadContract({
     address: PMAIRDROP_ADDRESS,
-    abi: PMAirdropABI,
-    functionName: 'getAllTasks',
+    abi: AIRDROP_ABI,
+    functionName: 'totalReward',
+    chainId: 56,
+    query: { enabled: isContractDeployed }
+  });
+
+  const { data: maxClaimable, refetch: refetchMaxClaimable } = useReadContract({
+    address: PMAIRDROP_ADDRESS,
+    abi: AIRDROP_ABI,
+    functionName: 'maxClaimable',
+    chainId: 56,
+    query: { enabled: isContractDeployed }
+  });
+
+  const { data: totalClaimed, refetch: refetchTotalClaimed } = useReadContract({
+    address: PMAIRDROP_ADDRESS,
+    abi: AIRDROP_ABI,
+    functionName: 'totalClaimed',
     chainId: 56,
     query: { enabled: isContractDeployed }
   });
@@ -114,70 +108,80 @@ const AirdropAdminPage = () => {
 
   // Update local state from contract data
   useEffect(() => {
-    if (adminInfo) {
-      const info = adminInfo as any;
-      setFeeCollectorAddress(info[1] as string);
-      // Fees are now in wei, convert to ether string
-      setClaimFee(formatEther(info[2] as bigint));
-      setNetworkFee(formatEther(info[3] as bigint));
+    if (claimFeeBNB) {
+      setClaimFee(formatEther(claimFeeBNB as bigint));
     }
-  }, [adminInfo]);
+  }, [claimFeeBNB]);
 
   useEffect(() => {
-    if (airdropInfo) {
-      const info = airdropInfo as any;
-      setMaxClaimableValue(formatUnits(info[2] as bigint, 18));
+    if (networkFeeBNB) {
+      setNetworkFee(formatEther(networkFeeBNB as bigint));
     }
-  }, [airdropInfo]);
+  }, [networkFeeBNB]);
 
   useEffect(() => {
-    if (allTasks) {
-      const [names, links, rewards, enabledList] = allTasks as [string[], string[], bigint[], boolean[]];
-      const taskList: TaskConfig[] = names.map((name, i) => ({
-        id: i,
-        name,
-        link: links[i],
-        reward: formatUnits(rewards[i], 18),
-        enabled: enabledList[i]
-      }));
-      setTasks(taskList);
-      setNewTask(prev => ({ ...prev, id: taskList.length }));
+    if (feeCollector) {
+      setFeeCollectorAddress(feeCollector as string);
     }
-  }, [allTasks]);
+  }, [feeCollector]);
+
+  useEffect(() => {
+    if (totalReward) {
+      setTotalRewardValue(formatUnits(totalReward as bigint, 18));
+    }
+  }, [totalReward]);
+
+  useEffect(() => {
+    if (maxClaimable) {
+      setMaxClaimableValue(formatUnits(maxClaimable as bigint, 18));
+    }
+  }, [maxClaimable]);
 
   // Refresh on confirmation
   useEffect(() => {
     if (isConfirmed) {
       toast.success("Transaction confirmed!");
-      refetchAdminInfo();
-      refetchFeeInfo();
-      refetchAirdropInfo();
-      refetchTasks();
+      refetchClaimFee();
+      refetchNetworkFee();
+      refetchFeeCollector();
+      refetchTotalReward();
+      refetchMaxClaimable();
+      refetchTotalClaimed();
     }
   }, [isConfirmed]);
+
+  const refetchAll = () => {
+    refetchClaimFee();
+    refetchNetworkFee();
+    refetchFeeCollector();
+    refetchTotalReward();
+    refetchMaxClaimable();
+    refetchTotalClaimed();
+    toast.success("Data refreshed!");
+  };
 
   // Admin actions
   const handleSetClaimFee = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
-    // Convert BNB amount to wei
-    const feeInWei = parseUnits(claimFee || "0", 18);
+    const feeInWei = parseEther(claimFee || "0");
     writeContract({
       address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
+      abi: AIRDROP_ABI,
       functionName: 'setClaimFeeBNB',
       args: [feeInWei],
+      chainId: 56,
     } as any);
   };
 
   const handleSetNetworkFee = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
-    // Convert BNB amount to wei
-    const feeInWei = parseUnits(networkFee || "0", 18);
+    const feeInWei = parseEther(networkFee || "0");
     writeContract({
       address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
+      abi: AIRDROP_ABI,
       functionName: 'setNetworkFeeBNB',
       args: [feeInWei],
+      chainId: 56,
     } as any);
   };
 
@@ -188,88 +192,61 @@ const AirdropAdminPage = () => {
     }
     writeContract({
       address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
+      abi: AIRDROP_ABI,
       functionName: 'setFeeCollector',
       args: [feeCollectorAddress as `0x${string}`],
+      chainId: 56,
     } as any);
   };
 
-  const handleStartAirdrop = () => {
+  const handleSetTotalReward = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
-    const durationSeconds = BigInt(parseInt(airdropDuration) * 24 * 60 * 60);
-    const maxTokens = parseUnits(maxClaimableValue || "0", 18);
+    const rewardInWei = parseUnits(totalRewardValue || "0", 18);
     writeContract({
       address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
-      functionName: 'startAirdrop',
-      args: [durationSeconds, maxTokens],
+      abi: AIRDROP_ABI,
+      functionName: 'setTotalReward',
+      args: [rewardInWei],
+      chainId: 56,
     } as any);
   };
 
-  const handleEndAirdrop = () => {
+  const handleSetMaxClaimable = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
+    const maxInWei = parseUnits(maxClaimableValue || "0", 18);
     writeContract({
       address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
-      functionName: 'endAirdrop',
-      args: [],
+      abi: AIRDROP_ABI,
+      functionName: 'setMaxClaimable',
+      args: [maxInWei],
+      chainId: 56,
     } as any);
   };
 
-  const handleResumeAirdrop = () => {
+  const handleWithdrawTokens = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
-    writeContract({
-      address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
-      functionName: 'resumeAirdrop',
-      args: [],
-    } as any);
-  };
-
-  const handleWithdrawFees = () => {
-    if (!isOwner) return toast.error("Only owner can perform this action");
-    writeContract({
-      address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
-      functionName: 'withdrawFees',
-      args: [],
-    } as any);
-  };
-
-  const handleConfigureTask = (task: TaskConfig) => {
-    if (!isOwner) return toast.error("Only owner can perform this action");
-    const rewardInWei = parseUnits(task.reward || "0", 18);
-    writeContract({
-      address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
-      functionName: 'configureTask',
-      args: [BigInt(task.id), task.name, task.link, rewardInWei, task.enabled],
-    } as any);
-  };
-
-  const handleAddTask = () => {
-    if (!newTask.name || !newTask.link) {
-      return toast.error("Please fill in task name and link");
+    const remainingTokens = maxClaimable && totalClaimed 
+      ? (maxClaimable as bigint) - (totalClaimed as bigint) 
+      : BigInt(0);
+    if (remainingTokens <= BigInt(0)) {
+      return toast.error("No tokens to withdraw");
     }
-    handleConfigureTask(newTask);
-    setNewTask({ id: newTask.id + 1, name: "", link: "", reward: "100", enabled: true });
-  };
-
-  const handleToggleTask = (taskId: number, enabled: boolean) => {
-    if (!isOwner) return toast.error("Only owner can perform this action");
     writeContract({
       address: PMAIRDROP_ADDRESS,
-      abi: PMAirdropABI,
-      functionName: 'setTaskEnabled',
-      args: [BigInt(taskId), enabled],
+      abi: AIRDROP_ABI,
+      functionName: 'withdrawTokens',
+      args: [remainingTokens],
+      chainId: 56,
     } as any);
   };
 
   // Format display values
-  const contractBalance = adminInfo ? formatEther((adminInfo as any)[4] as bigint) : "0";
-  const totalFeesCollected = airdropInfo ? formatEther((airdropInfo as any)[8] as bigint) : "0";
-  const totalNetworkFeesCollected = airdropInfo ? formatEther((airdropInfo as any)[9] as bigint) : "0";
-  const isActiveAirdrop = airdropInfo ? (airdropInfo as any)[5] as boolean : false;
+  const totalClaimedFormatted = totalClaimed ? formatUnits(totalClaimed as bigint, 18) : "0";
+  const maxClaimableFormatted = maxClaimable ? formatUnits(maxClaimable as bigint, 18) : "0";
+  const totalRewardFormatted = totalReward ? formatUnits(totalReward as bigint, 18) : "0";
+  const remainingTokens = maxClaimable && totalClaimed 
+    ? Number(maxClaimableFormatted) - Number(totalClaimedFormatted)
+    : 0;
 
   if (!isConnected) {
     return (
@@ -319,53 +296,56 @@ const AirdropAdminPage = () => {
     <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
       <Header />
       <TradingViewTicker />
-      <HeroBanner title="Airdrop Admin Panel" subtitle="Manage airdrop settings and tasks" />
+      <HeroBanner title="Airdrop Admin Panel" subtitle="Manage airdrop settings for the new contract" />
       
       <main className="container mx-auto px-4 pt-12 pb-12 flex-1">
-        <Link to="/dashboard/airdrop" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Airdrop
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link to="/dashboard/airdrop" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Airdrop
+          </Link>
+          <Button variant="outline" size="sm" onClick={refetchAll} disabled={isPending || isConfirming}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isConfirming ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
 
         {/* Overview Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/30">
             <div className="flex items-center gap-2 mb-2">
-              <Wallet className="h-4 w-4 text-green-500" />
-              <span className="text-xs text-muted-foreground">Contract Balance</span>
+              <Coins className="h-4 w-4 text-green-500" />
+              <span className="text-xs text-muted-foreground">Total Reward</span>
             </div>
-            <p className="text-lg font-bold">{parseFloat(contractBalance).toFixed(4)} BNB</p>
+            <p className="text-lg font-bold">{Number(totalRewardFormatted).toLocaleString()} PM</p>
           </Card>
           <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/30">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-blue-500" />
-              <span className="text-xs text-muted-foreground">Claim Fees</span>
+              <BarChart3 className="h-4 w-4 text-blue-500" />
+              <span className="text-xs text-muted-foreground">Max Claimable</span>
             </div>
-            <p className="text-lg font-bold">{parseFloat(totalFeesCollected).toFixed(6)} BNB</p>
+            <p className="text-lg font-bold">{Number(maxClaimableFormatted).toLocaleString()} PM</p>
           </Card>
           <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/30">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-purple-500" />
-              <span className="text-xs text-muted-foreground">Network Fees</span>
+              <Users className="h-4 w-4 text-purple-500" />
+              <span className="text-xs text-muted-foreground">Total Claimed</span>
             </div>
-            <p className="text-lg font-bold">{parseFloat(totalNetworkFeesCollected).toFixed(6)} BNB</p>
+            <p className="text-lg font-bold">{Number(totalClaimedFormatted).toLocaleString()} PM</p>
           </Card>
           <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/30">
             <div className="flex items-center gap-2 mb-2">
-              <Users className="h-4 w-4 text-orange-500" />
-              <span className="text-xs text-muted-foreground">Status</span>
+              <Wallet className="h-4 w-4 text-orange-500" />
+              <span className="text-xs text-muted-foreground">Remaining</span>
             </div>
-            <p className={`text-lg font-bold ${isActiveAirdrop ? 'text-green-500' : 'text-red-500'}`}>
-              {isActiveAirdrop ? 'Active' : 'Inactive'}
-            </p>
+            <p className="text-lg font-bold">{remainingTokens.toLocaleString()} PM</p>
           </Card>
         </div>
 
         <Tabs defaultValue="fees" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="fees">Fee Settings</TabsTrigger>
-            <TabsTrigger value="airdrop">Airdrop Control</TabsTrigger>
-            <TabsTrigger value="tasks">Task Management</TabsTrigger>
+            <TabsTrigger value="rewards">Reward Settings</TabsTrigger>
           </TabsList>
 
           {/* Fee Settings Tab */}
@@ -382,32 +362,32 @@ const AirdropAdminPage = () => {
                     <div className="flex gap-2 mt-1">
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="0.0001"
                         value={claimFee}
                         onChange={(e) => setClaimFee(e.target.value)}
-                        placeholder="0.00001"
+                        placeholder="0.0005"
                       />
-                      <Button onClick={handleSetClaimFee} disabled={isPending}>
-                        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      <Button onClick={handleSetClaimFee} disabled={isPending || isConfirming}>
+                        {isPending || isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Fee charged for each task claim (in BNB)</p>
+                    <p className="text-xs text-muted-foreground mt-1">Fee charged when claiming all tasks</p>
                   </div>
                   <div>
                     <Label>Network Fee (BNB)</Label>
                     <div className="flex gap-2 mt-1">
                       <Input
                         type="number"
-                        step="0.00001"
+                        step="0.0001"
                         value={networkFee}
                         onChange={(e) => setNetworkFee(e.target.value)}
-                        placeholder="0.00001"
+                        placeholder="0.0005"
                       />
-                      <Button onClick={handleSetNetworkFee} disabled={isPending}>
-                        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      <Button onClick={handleSetNetworkFee} disabled={isPending || isConfirming}>
+                        {isPending || isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Additional network/gas fee (in BNB)</p>
+                    <p className="text-xs text-muted-foreground mt-1">Additional network fee in BNB</p>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -419,187 +399,92 @@ const AirdropAdminPage = () => {
                         onChange={(e) => setFeeCollectorAddress(e.target.value)}
                         placeholder="0x..."
                       />
-                      <Button onClick={handleSetFeeCollector} disabled={isPending}>
-                        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      <Button onClick={handleSetFeeCollector} disabled={isPending || isConfirming}>
+                        {isPending || isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">Address that receives collected fees</p>
                   </div>
-                  <div>
-                    <Label>Withdraw Collected Fees</Label>
-                    <Button onClick={handleWithdrawFees} disabled={isPending} className="w-full mt-1" variant="outline">
-                      {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wallet className="h-4 w-4 mr-2" />}
-                      Withdraw All Fees
-                    </Button>
-                  </div>
                 </div>
               </div>
             </Card>
           </TabsContent>
 
-          {/* Airdrop Control Tab */}
-          <TabsContent value="airdrop">
+          {/* Reward Settings Tab */}
+          <TabsContent value="rewards">
             <Card className="p-6">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <Settings className="h-5 w-5 text-primary" />
-                Airdrop Control
+                Reward Configuration
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <Label>Duration (Days)</Label>
-                    <Input
-                      type="number"
-                      value={airdropDuration}
-                      onChange={(e) => setAirdropDuration(e.target.value)}
-                      placeholder="30"
-                      className="mt-1"
-                    />
+                    <Label>Total Reward (PM per user)</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        type="number"
+                        value={totalRewardValue}
+                        onChange={(e) => setTotalRewardValue(e.target.value)}
+                        placeholder="100000"
+                      />
+                      <Button onClick={handleSetTotalReward} disabled={isPending || isConfirming}>
+                        {isPending || isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">PM tokens given per user after completing all 9 tasks</p>
                   </div>
                   <div>
-                    <Label>Max Claimable Tokens</Label>
-                    <Input
-                      type="number"
-                      value={maxClaimableValue}
-                      onChange={(e) => setMaxClaimableValue(e.target.value)}
-                      placeholder="1000000"
-                      className="mt-1"
-                    />
+                    <Label>Max Claimable Total (PM)</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        type="number"
+                        value={maxClaimableValue}
+                        onChange={(e) => setMaxClaimableValue(e.target.value)}
+                        placeholder="10000000"
+                      />
+                      <Button onClick={handleSetMaxClaimable} disabled={isPending || isConfirming}>
+                        {isPending || isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Total PM tokens available in airdrop pool</p>
                   </div>
-                  <Button onClick={handleStartAirdrop} disabled={isPending || isActiveAirdrop} className="w-full">
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Start Airdrop
-                  </Button>
                 </div>
                 <div className="space-y-4">
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm font-medium mb-2">Current Status</p>
-                    <p className={`text-2xl font-bold ${isActiveAirdrop ? 'text-green-500' : 'text-red-500'}`}>
-                      {isActiveAirdrop ? 'ACTIVE' : 'INACTIVE'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
+                  <div>
+                    <Label>Withdraw Remaining Tokens</Label>
                     <Button 
-                      onClick={handleEndAirdrop} 
-                      disabled={isPending || !isActiveAirdrop} 
-                      variant="destructive"
-                      className="flex-1"
-                    >
-                      End Airdrop
-                    </Button>
-                    <Button 
-                      onClick={handleResumeAirdrop} 
-                      disabled={isPending || isActiveAirdrop} 
+                      onClick={handleWithdrawTokens} 
+                      disabled={isPending || isConfirming || remainingTokens <= 0} 
+                      className="w-full mt-1" 
                       variant="outline"
-                      className="flex-1"
                     >
-                      Resume Airdrop
+                      {isPending || isConfirming ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Wallet className="h-4 w-4 mr-2" />
+                      )}
+                      Withdraw {remainingTokens.toLocaleString()} PM
                     </Button>
+                    <p className="text-xs text-muted-foreground mt-1">Emergency withdraw unclaimed tokens</p>
                   </div>
-                  <Button 
-                    onClick={() => { refetchAdminInfo(); refetchFeeInfo(); refetchAirdropInfo(); refetchTasks(); }}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Data
-                  </Button>
                 </div>
               </div>
-            </Card>
-          </TabsContent>
-
-          {/* Task Management Tab */}
-          <TabsContent value="tasks">
-            <Card className="p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <Plus className="h-5 w-5 text-primary" />
-                Task Management
-              </h3>
-              
-              {/* Add New Task */}
-              <div className="p-4 bg-muted/50 rounded-lg mb-6">
-                <h4 className="font-medium mb-3">Add New Task</h4>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <Input
-                    placeholder="Task Name"
-                    value={newTask.name}
-                    onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Task Link (https://...)"
-                    value={newTask.link}
-                    onChange={(e) => setNewTask({ ...newTask, link: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Reward (PM)"
-                    value={newTask.reward}
-                    onChange={(e) => setNewTask({ ...newTask, reward: e.target.value })}
-                  />
-                  <Button onClick={handleAddTask} disabled={isPending}>
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                    Add Task
-                  </Button>
-                </div>
-              </div>
-
-              {/* Existing Tasks */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Link</TableHead>
-                    <TableHead>Reward</TableHead>
-                    <TableHead>Enabled</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tasks.map((task) => (
-                    <TableRow key={task.id}>
-                      <TableCell>{task.id}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{task.name}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        <a href={task.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                          {task.link}
-                        </a>
-                      </TableCell>
-                      <TableCell>{task.reward} PM</TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={task.enabled}
-                          onCheckedChange={(checked) => handleToggleTask(task.id, checked)}
-                          disabled={isPending}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleConfigureTask(task)}
-                          disabled={isPending}
-                        >
-                          <Save className="h-3 w-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {tasks.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No tasks configured yet. Add your first task above.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
             </Card>
           </TabsContent>
         </Tabs>
-      </main>
 
+        {/* Contract Info */}
+        <Card className="mt-6 p-4 bg-muted/50">
+          <h4 className="font-medium mb-2">Contract Information</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <p><span className="text-muted-foreground">Contract:</span> {PMAIRDROP_ADDRESS}</p>
+            <p><span className="text-muted-foreground">Owner:</span> {contractOwner as string}</p>
+            <p><span className="text-muted-foreground">Claim Fee:</span> {formatEther(claimFeeBNB as bigint || BigInt(0))} BNB</p>
+            <p><span className="text-muted-foreground">Network Fee:</span> {formatEther(networkFeeBNB as bigint || BigInt(0))} BNB</p>
+          </div>
+        </Card>
+      </main>
       <Footer />
       <MobileBottomNav />
     </div>

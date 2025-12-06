@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import confetti from "canvas-confetti";
 import pmLogo from "@/assets/pm-logo-new.png";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -382,16 +383,45 @@ const AirdropPage = () => {
     }
   }, [isVisitConfirmed, visitTxHash]);
 
+  // Confetti celebration function
+  const triggerConfetti = useCallback(() => {
+    const duration = 3000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+      if (timeLeft <= 0) return clearInterval(interval);
+
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+        colors: ['#FFD700', '#FFA500', '#FF6347', '#00FF00', '#1E90FF', '#9370DB'],
+      });
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+        colors: ['#FFD700', '#FFA500', '#FF6347', '#00FF00', '#1E90FF', '#9370DB'],
+      });
+    }, 250);
+  }, []);
+
   // Handle claim reward confirmation
   useEffect(() => {
     if (isClaimConfirmed && claimTxHash) {
       refetchHasClaimed();
       refetchTotalClaimed();
       refetchBalance();
-      toast.success(`Claimed ${totalRewardFormatted} PM tokens!`);
+      toast.success(`🎉 Claimed ${totalRewardFormatted} PM tokens!`);
+      triggerConfetti();
       window.dispatchEvent(new Event("balanceUpdate"));
     }
-  }, [isClaimConfirmed, claimTxHash]);
+  }, [isClaimConfirmed, claimTxHash, triggerConfetti]);
 
   const isProcessing = isVisitPending || isVisitConfirming || isClaimPending || isClaimConfirming;
 
