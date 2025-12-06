@@ -114,17 +114,12 @@ const AirdropAdminPage = () => {
 
   // Update local state from contract data
   useEffect(() => {
-    if (feeInfo) {
-      const info = feeInfo as any;
-      setClaimFee((Number(info[0]) / 1e8).toString());
-      setNetworkFee((Number(info[1]) / 1e8).toString());
-    }
-  }, [feeInfo]);
-
-  useEffect(() => {
     if (adminInfo) {
       const info = adminInfo as any;
       setFeeCollectorAddress(info[1] as string);
+      // Fees are now in wei, convert to ether string
+      setClaimFee(formatEther(info[2] as bigint));
+      setNetworkFee(formatEther(info[3] as bigint));
     }
   }, [adminInfo]);
 
@@ -164,26 +159,25 @@ const AirdropAdminPage = () => {
   // Admin actions
   const handleSetClaimFee = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
-    const feeIn8Decimals = BigInt(Math.round(parseFloat(claimFee) * 1e8));
+    // Convert BNB amount to wei
+    const feeInWei = parseUnits(claimFee || "0", 18);
     writeContract({
       address: PMAIRDROP_ADDRESS,
       abi: PMAirdropABI,
-      functionName: 'setClaimFeeUSD',
-      args: [feeIn8Decimals],
+      functionName: 'setClaimFeeBNB',
+      args: [feeInWei],
     } as any);
   };
 
   const handleSetNetworkFee = () => {
     if (!isOwner) return toast.error("Only owner can perform this action");
-    const feeIn8Decimals = BigInt(Math.round(parseFloat(networkFee) * 1e8));
-    if (feeIn8Decimals < BigInt(1000000)) {
-      return toast.error("Network fee must be at least $0.01");
-    }
+    // Convert BNB amount to wei
+    const feeInWei = parseUnits(networkFee || "0", 18);
     writeContract({
       address: PMAIRDROP_ADDRESS,
       abi: PMAirdropABI,
-      functionName: 'setNetworkFeeUSD',
-      args: [feeIn8Decimals],
+      functionName: 'setNetworkFeeBNB',
+      args: [feeInWei],
     } as any);
   };
 
@@ -384,37 +378,36 @@ const AirdropAdminPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <Label>Claim Fee (USD)</Label>
+                    <Label>Claim Fee (BNB)</Label>
                     <div className="flex gap-2 mt-1">
                       <Input
                         type="number"
-                        step="0.001"
+                        step="0.00001"
                         value={claimFee}
                         onChange={(e) => setClaimFee(e.target.value)}
-                        placeholder="0.01"
+                        placeholder="0.00001"
                       />
                       <Button onClick={handleSetClaimFee} disabled={isPending}>
                         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Fee charged for each task claim</p>
+                    <p className="text-xs text-muted-foreground mt-1">Fee charged for each task claim (in BNB)</p>
                   </div>
                   <div>
-                    <Label>Network Fee (USD) - Min $0.01</Label>
+                    <Label>Network Fee (BNB)</Label>
                     <div className="flex gap-2 mt-1">
                       <Input
                         type="number"
-                        step="0.001"
-                        min="0.01"
+                        step="0.00001"
                         value={networkFee}
                         onChange={(e) => setNetworkFee(e.target.value)}
-                        placeholder="0.01"
+                        placeholder="0.00001"
                       />
                       <Button onClick={handleSetNetworkFee} disabled={isPending}>
                         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Additional network/gas fee (minimum $0.01)</p>
+                    <p className="text-xs text-muted-foreground mt-1">Additional network/gas fee (in BNB)</p>
                   </div>
                 </div>
                 <div className="space-y-4">

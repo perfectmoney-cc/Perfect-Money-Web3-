@@ -31,12 +31,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const PMAIRDROP_ADDRESS = CONTRACT_ADDRESSES[56].PMAirdrop as `0x${string}`;
-const CLAIM_FEE_USD = 0.01; // Fee in USD for each claim
 
 const AirdropPage = () => {
   const { address, isConnected } = useAccount();
   const [walletAddress, setWalletAddress] = useState("");
-  const [bnbPrice, setBnbPrice] = useState<number>(600); // Default fallback price
+  const [bnbPrice, setBnbPrice] = useState<number>(600); // For display purposes
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingTask, setPendingTask] = useState<{ id: number; link: string; title: string } | null>(null);
 
@@ -64,8 +63,7 @@ const AirdropPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate BNB amount for $0.01 fee (fallback)
-  const claimFeeBnb = CLAIM_FEE_USD / bnbPrice;
+  // Get user's BNB balance in readable format
   const userBnbBalance = bnbBalance ? parseFloat(formatEther(bnbBalance.value)) : 0;
 
   // Check if contract is deployed
@@ -120,7 +118,7 @@ const AirdropPage = () => {
     query: { enabled: isContractDeployed }
   });
 
-  // Get fee info from contract (includes claim fee + network fee)
+  // Get fee info from contract (flat BNB fees)
   const { data: feeInfo } = useReadContract({
     address: PMAIRDROP_ADDRESS,
     abi: PMAirdropABI,
@@ -129,13 +127,11 @@ const AirdropPage = () => {
     query: { enabled: isContractDeployed }
   });
 
-  // Use contract total fee if available, otherwise use calculated fee
-  // getFeeInfo returns: [claimFeeUSD, networkFeeUSD, totalFeeUSD, claimFeeBNB, networkFeeBNB, totalFeeBNB, bnbPrice]
-  const contractTotalFeeBnb = feeInfo ? Number(formatUnits((feeInfo as any)[5] as bigint, 18)) : null;
-  const contractClaimFeeBnb = feeInfo ? Number(formatUnits((feeInfo as any)[3] as bigint, 18)) : null;
-  const contractNetworkFeeBnb = feeInfo ? Number(formatUnits((feeInfo as any)[4] as bigint, 18)) : null;
-  const effectiveClaimFeeBnb = contractTotalFeeBnb ?? claimFeeBnb;
-  const hasEnoughBnb = userBnbBalance >= effectiveClaimFeeBnb;
+  // Extract fee values from contract (now returns claimFeeBNB, networkFeeBNB, totalFeeBNB directly)
+  const contractClaimFeeBnb = feeInfo ? Number(formatEther((feeInfo as any)[0] as bigint)) : 0.00001;
+  const contractNetworkFeeBnb = feeInfo ? Number(formatEther((feeInfo as any)[1] as bigint)) : 0.00001;
+  const contractTotalFeeBnb = feeInfo ? Number(formatEther((feeInfo as any)[2] as bigint)) : 0.00002;
+  const hasEnoughBnb = userBnbBalance >= contractTotalFeeBnb;
 
   // User-specific data
   const { data: hasClaimed, refetch: refetchHasClaimed } = useReadContract({
@@ -301,15 +297,15 @@ const AirdropPage = () => {
     if (!pendingTask) return;
     
     if (!hasEnoughBnb) {
-      toast.error(`Insufficient BNB balance. You need at least ${effectiveClaimFeeBnb.toFixed(6)} BNB`);
+      toast.error(`Insufficient BNB balance. You need at least ${contractTotalFeeBnb.toFixed(6)} BNB`);
       setConfirmDialogOpen(false);
       setPendingTask(null);
       return;
     }
 
     try {
-      // Calculate fee: $0.01 worth of BNB
-      const feeInBnb = parseEther(effectiveClaimFeeBnb.toFixed(18));
+      // Use flat BNB fee from contract
+      const feeInBnb = parseEther(contractTotalFeeBnb.toFixed(18));
       
       writeContract({
         address: PMAIRDROP_ADDRESS,
@@ -319,7 +315,7 @@ const AirdropPage = () => {
         value: feeInBnb,
       } as any);
       
-      toast.info(`Claiming task with $${CLAIM_FEE_USD} fee (~${effectiveClaimFeeBnb.toFixed(6)} BNB)`);
+      toast.info(`Claiming task with ${contractTotalFeeBnb.toFixed(6)} BNB fee`);
     } catch (error: any) {
       toast.error(error?.message || "Failed to claim task reward");
     }
@@ -437,8 +433,8 @@ const AirdropPage = () => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Claim Fee</p>
-                <p className="text-sm font-medium">${CLAIM_FEE_USD} (~{effectiveClaimFeeBnb.toFixed(6)} BNB)</p>
+                <p className="text-xs text-muted-foreground">Total Claim Fee</p>
+                <p className="text-sm font-medium">{contractTotalFeeBnb.toFixed(6)} BNB</p>
                 {!hasEnoughBnb && (
                   <p className="text-xs text-red-400 mt-1">Insufficient balance</p>
                 )}
@@ -520,7 +516,7 @@ const AirdropPage = () => {
               <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                 <p className="text-xs text-yellow-400 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <span>Each claim requires a small fee of <strong>${CLAIM_FEE_USD}</strong> (~{effectiveClaimFeeBnb.toFixed(6)} BNB)</span>
+                  <span>Each claim requires a fee of <strong>{contractTotalFeeBnb.toFixed(6)} BNB</strong> (Claim: {contractClaimFeeBnb.toFixed(6)} + Network: {contractNetworkFeeBnb.toFixed(6)})</span>
                 </p>
               </div>
               
@@ -664,15 +660,15 @@ const AirdropPage = () => {
               <div className="p-3 bg-muted rounded-lg space-y-2 mt-4">
                 <div className="flex justify-between text-sm">
                   <span>Claim Fee:</span>
-                  <span className="font-medium">${CLAIM_FEE_USD} ({contractClaimFeeBnb?.toFixed(6) || "..."} BNB)</span>
+                  <span className="font-medium">{contractClaimFeeBnb.toFixed(6)} BNB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Network Fee:</span>
-                  <span className="font-medium">${CLAIM_FEE_USD} ({contractNetworkFeeBnb?.toFixed(6) || "..."} BNB)</span>
+                  <span className="font-medium">{contractNetworkFeeBnb.toFixed(6)} BNB</span>
                 </div>
                 <div className="flex justify-between text-sm font-medium">
                   <span>Total Fee:</span>
-                  <span className="text-primary">{effectiveClaimFeeBnb.toFixed(6)} BNB</span>
+                  <span className="text-primary">{contractTotalFeeBnb.toFixed(6)} BNB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Your Balance:</span>
