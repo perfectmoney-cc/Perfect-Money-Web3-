@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import pmLogo from "@/assets/pm-logo-new.png";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import { Footer } from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
 import { 
   ArrowLeft, Search, Users, TrendingUp, Package, 
-  BarChart3, ChevronLeft, ChevronRight, Star
+  BarChart3, ChevronLeft, ChevronRight, Star, Loader2
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useNFTStats } from "@/hooks/useNFTMarketplace";
 
 interface Collection {
   rank: number;
@@ -42,6 +43,9 @@ const MarketplaceStats = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
+  
+  // Fetch real blockchain data
+  const { totalMinted, totalSupply, mintingFee, platformFeePercent, isLoading: statsLoading } = useNFTStats();
 
   // Sample collections data
   const allCollections: Collection[] = [
@@ -90,12 +94,15 @@ const MarketplaceStats = () => {
   const displayedCollections = filteredCollections.slice(startIndex, startIndex + itemsPerPage);
   const displayedHolders = filteredHolders.slice(startIndex, startIndex + itemsPerPage);
 
-  // Global stats
+  // Global stats combining blockchain data with sample data
   const globalStats = {
     totalCollections: allCollections.length,
     totalHolders: allHolders.length,
     totalVolume: allCollections.reduce((sum, c) => sum + c.volume, 0),
-    totalNFTs: allHolders.reduce((sum, h) => sum + h.nftsOwned, 0),
+    totalNFTs: totalMinted > 0 ? totalMinted : allHolders.reduce((sum, h) => sum + h.nftsOwned, 0),
+    totalMintedOnChain: totalMinted,
+    mintingFee,
+    platformFeePercent,
   };
 
   return (
@@ -114,31 +121,50 @@ const MarketplaceStats = () => {
 
         <div className="max-w-7xl mx-auto">
           {/* Global Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
-              <Package className="h-6 w-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold">{globalStats.totalCollections}</p>
-              <p className="text-xs text-muted-foreground">Collections</p>
-            </Card>
-            <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
-              <Users className="h-6 w-6 text-blue-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold">{globalStats.totalHolders}</p>
-              <p className="text-xs text-muted-foreground">Unique Holders</p>
-            </Card>
-            <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
-              <TrendingUp className="h-6 w-6 text-green-500 mx-auto mb-2" />
-              <div className="flex items-center justify-center gap-1">
-                <p className="text-2xl font-bold">{globalStats.totalVolume.toLocaleString()}</p>
-                <img src={pmLogo} alt="PM" className="h-5 w-5" />
-              </div>
-              <p className="text-xs text-muted-foreground">Total Volume</p>
-            </Card>
-            <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
-              <BarChart3 className="h-6 w-6 text-purple-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold">{globalStats.totalNFTs.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Total NFTs</p>
-            </Card>
-          </div>
+          {statsLoading ? (
+            <div className="flex items-center justify-center py-8 mb-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading blockchain data...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+              <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
+                <Package className="h-6 w-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold">{globalStats.totalCollections}</p>
+                <p className="text-xs text-muted-foreground">Collections</p>
+              </Card>
+              <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
+                <Users className="h-6 w-6 text-blue-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold">{globalStats.totalHolders}</p>
+                <p className="text-xs text-muted-foreground">Unique Holders</p>
+              </Card>
+              <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
+                <TrendingUp className="h-6 w-6 text-green-500 mx-auto mb-2" />
+                <div className="flex items-center justify-center gap-1">
+                  <p className="text-2xl font-bold">{globalStats.totalVolume.toLocaleString()}</p>
+                  <img src={pmLogo} alt="PM" className="h-5 w-5" />
+                </div>
+                <p className="text-xs text-muted-foreground">Total Volume</p>
+              </Card>
+              <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
+                <BarChart3 className="h-6 w-6 text-purple-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold">{globalStats.totalMintedOnChain}</p>
+                <p className="text-xs text-muted-foreground">Minted On-Chain</p>
+              </Card>
+              <Card className="p-4 bg-card/50 backdrop-blur-sm text-center border-primary/30">
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  <img src={pmLogo} alt="PM" className="h-6 w-6" />
+                </div>
+                <p className="text-2xl font-bold">{globalStats.mintingFee}</p>
+                <p className="text-xs text-muted-foreground">Minting Fee (PM)</p>
+              </Card>
+              <Card className="p-4 bg-card/50 backdrop-blur-sm text-center">
+                <BarChart3 className="h-6 w-6 text-orange-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold">{globalStats.platformFeePercent}%</p>
+                <p className="text-xs text-muted-foreground">Platform Fee</p>
+              </Card>
+            </div>
+          )}
 
           {/* Search */}
           <div className="flex items-center gap-4 mb-6">
