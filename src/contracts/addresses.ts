@@ -12,6 +12,7 @@ export const CONTRACT_ADDRESSES = {
     PMTokenSender: "0xDF51425A2Cf93426B5dA40eCa66cB7a698028eBD", // Deploy and update
     PMTokenLocker: "0xD91419A0937095D7780d5533ec186E39aeffDeCd", // Deploy and update
     PMTokenClaim: "0x0000000000000000000000000000000000000000", // Deploy and update
+    PMNFT: "0x0000000000000000000000000000000000000000", // Deploy and update
     // PancakeSwap V2 Router & Factory
     PancakeRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
     PancakeFactory: "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
