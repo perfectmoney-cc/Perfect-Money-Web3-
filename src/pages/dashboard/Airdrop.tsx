@@ -10,6 +10,8 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
+import { FaGithub } from "react-icons/fa";
+
 import {
   ArrowLeft,
   Gift,
@@ -41,6 +43,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// --- X.com icon (replaces old Twitter bird) ---
+const XBrandIcon = ({ size = 20, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M18.244 2H21.5l-7.36 8.412L23 22h-6.828l-5.3-6.918L4.5 22H1.244l7.823-8.938L1 2h6.828l4.873 6.313L18.244 2Zm-2.396 17.338h1.86L7.29 4.56H5.318l10.53 14.778Z" />
+  </svg>
+);
 
 const PMAIRDROP_ADDRESS = CONTRACT_ADDRESSES[56].PMAirdrop as `0x${string}`;
 const TOTAL_TASKS = 9; // Fixed in contract
@@ -77,32 +86,38 @@ const TASK_DEFINITIONS = [
   },
   {
     id: 4,
-    title: "Follow us on Twitter",
-    icon: FaTwitter,
-    link: "https://twitter.com/perfectmoney",
-    color: "text-sky-500",
+    title: "Follow us on X",
+    icon: XBrandIcon,
+    link: "https://x.com/perfectmoney_cc",
+    color: "text-white",
   },
   {
     id: 5,
-    title: "React or Tweet Post",
-    icon: FaTwitter,
-    link: "https://twitter.com/perfectmoney",
-    color: "text-sky-500",
+    title: "React or Post on X",
+    icon: XBrandIcon,
+    link: "https://x.com/perfectmoney_cc/status/1994303002920796389",
+    color: "text-white",
   },
-  { id: 6, title: "Join Telegram Group", icon: FaTelegram, link: "https://t.me/perfectmoney", color: "text-cyan-500" },
+  {
+    id: 6,
+    title: "Subscribe to Telegram Channel",
+    icon: FaTelegram,
+    link: "t.me/perfectmoney_cc",
+    color: "text-cyan-500",
+  },
   {
     id: 7,
     title: "Review on TrustPilot",
     icon: SiTrustpilot,
-    link: "https://trustpilot.com/review/perfectmoney.com",
+    link: "https://www.trustpilot.com/review/perfectmoney.cc",
     color: "text-green-600",
   },
   {
     id: 8,
-    title: "Review on Google",
-    icon: SiGoogle,
-    link: "https://g.page/r/perfectmoney/review",
-    color: "text-blue-500",
+    title: "Visit our GitHub Repo",
+    icon: FaGithub,
+    link: "https://github.com/perfectmoney", // change to your exact repo URL
+    color: "text-gray-800",
   },
 ];
 
