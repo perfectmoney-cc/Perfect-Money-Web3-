@@ -363,15 +363,28 @@ const MarketplacePage = () => {
           <WalletCard showQuickFunctionsToggle={false} compact={true} />
         </div>
 
-        <div className="flex items-center justify-between mb-6">
-          <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
-          <Button variant="gradient" onClick={() => navigate("/dashboard/mint-nft")}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            Mint NFT
-          </Button>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex items-center justify-between">
+            <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
+            <Button variant="gradient" onClick={() => navigate("/dashboard/mint-nft")}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Mint NFT
+            </Button>
+          </div>
+          {/* Navigation Links to Sub-pages */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/marketplace/minters")}>
+              <User className="h-4 w-4 mr-2" />
+              Minters
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/marketplace/stats")}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Stats
+            </Button>
+          </div>
         </div>
 
         <div className="max-w-7xl mx-auto">
