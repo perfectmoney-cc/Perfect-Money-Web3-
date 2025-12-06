@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
+const SUPABASE_URL = "https://hxfyxlbkghxnepwwabme.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4Znl4bGJrZ2h4bmVwd3dhYm1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMjg3OTQsImV4cCI6MjA2MzYwNDc5NH0.vnU5bBBGt15cHV3wB6NnkPz8xwcFjFJWvNi6F7bsjZ8";
 
 export interface NFTMetadata {
   name: string;
@@ -28,14 +29,22 @@ export async function uploadToIPFS(
   metadata: NFTMetadata
 ): Promise<IPFSUploadResult> {
   try {
-    const { data, error } = await supabase.functions.invoke("upload-to-ipfs", {
-      body: { image, metadata },
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-to-ipfs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ image, metadata }),
     });
 
-    if (error) {
-      throw new Error(error.message);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to upload to IPFS');
     }
 
+    const data = await response.json();
     return data as IPFSUploadResult;
   } catch (error: any) {
     console.error("IPFS upload error:", error);

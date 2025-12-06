@@ -232,22 +232,11 @@ export function useNFTMarketplace() {
     }
     
     try {
-      // Check if approval is needed for the NFT price
-      const { data: allowance } = await useReadContractAsync({
-        address: PMTOKEN_ADDRESS,
-        abi: PMTokenABI,
-        functionName: 'allowance',
-        args: [address, PMNFT_ADDRESS],
-      });
-
-      if (!allowance || (allowance as bigint) < price) {
+      // Always approve first to ensure sufficient allowance
+      if (!checkAllowance(price)) {
         toast.info('Step 1/2: Approving PM tokens for purchase...');
-        await writeContractAsync({
-          address: PMTOKEN_ADDRESS,
-          abi: PMTokenABI,
-          functionName: 'approve',
-          args: [PMNFT_ADDRESS, price],
-        } as any);
+        await approvePMToken(price);
+        await refetchAllowance();
       }
 
       toast.info('Step 2/2: Completing purchase...');
