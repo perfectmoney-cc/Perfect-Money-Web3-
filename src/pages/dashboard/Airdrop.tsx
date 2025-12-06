@@ -116,7 +116,7 @@ const TASK_DEFINITIONS = [
     id: 8,
     title: "Visit our GitHub Repo",
     icon: FaGithub,
-    link: "https://github.com/perfectmoney", // change to your exact repo URL
+    link: "https://github.com/perfectmoney-cc", // change to your exact repo URL
     color: "text-gray-800",
   },
 ];
