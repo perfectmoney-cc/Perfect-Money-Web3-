@@ -23,7 +23,7 @@ const MintNFTPage = () => {
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
   const { mintNFT } = useNFTMarketplace();
-  const { balance, allowance } = useTokenApproval();
+  const { balance, nftAllowance } = useTokenApproval();
   const { mintingFee: contractMintingFee } = useNFTStats();
   
   const [name, setName] = useState("");
@@ -38,7 +38,7 @@ const MintNFTPage = () => {
 
   const mintingFee = contractMintingFee ? parseFloat(contractMintingFee) : 10000;
   const hasEnoughBalance = balance ? parseFloat(formatEther(balance)) >= mintingFee : false;
-  const hasApproval = allowance ? allowance >= parseEther(mintingFee.toString()) : false;
+  const hasApproval = nftAllowance ? nftAllowance >= parseEther(mintingFee.toString()) : false;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
