@@ -14,7 +14,7 @@ import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
 import { Badge } from "@/components/ui/badge";
 import { NFTActivityFeed } from "@/components/NFTActivityFeed";
-import { ArrowLeft, ShoppingCart, TrendingUp, ChevronLeft, ChevronRight, Gavel, Eye, Timer, User, Sparkles, Heart, Settings } from "lucide-react";
+import { ArrowLeft, ShoppingCart, TrendingUp, ChevronLeft, ChevronRight, Gavel, Eye, Timer, User, Sparkles, Heart, Settings, Filter, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { NFTImage } from "@/components/NFTImage";
@@ -52,6 +52,10 @@ const MarketplacePage = () => {
   const [detailItem, setDetailItem] = useState<MarketItem | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [creatorFilter, setCreatorFilter] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const { favorites, toggleFavorite, isFavorite, favoritesCount } = useNFTFavorites();
   const itemsPerPage = 12;
 
@@ -108,16 +112,21 @@ const MarketplacePage = () => {
     toast.success(added ? `${item.name} added to favorites` : `${item.name} removed from favorites`);
   };
 
-  // Filtering
+  // Filtering with creator and price range
   const filteredItems = useMemo(() => {
     return marketItems.filter((item) => {
       const matchesSearch = searchQuery.trim() === "" ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.category.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const matchesCreator = creatorFilter.trim() === "" ||
+        item.seller.toLowerCase().includes(creatorFilter.toLowerCase());
+      const minPriceNum = minPrice ? parseFloat(minPrice) : 0;
+      const maxPriceNum = maxPrice ? parseFloat(maxPrice) : Infinity;
+      const matchesPrice = item.price >= minPriceNum && item.price <= maxPriceNum;
+      return matchesSearch && matchesCategory && matchesCreator && matchesPrice;
     });
-  }, [marketItems, searchQuery, selectedCategory]);
+  }, [marketItems, searchQuery, selectedCategory, creatorFilter, minPrice, maxPrice]);
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
@@ -328,6 +337,65 @@ const MarketplacePage = () => {
                   </Select>
                 </div>
               </div>
+
+              {/* Advanced Filters Toggle */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={showAdvancedFilters ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Advanced Filters
+                </Button>
+                {(creatorFilter || minPrice || maxPrice) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setCreatorFilter(""); setMinPrice(""); setMaxPrice(""); setCurrentPage(1); }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+
+              {/* Advanced Filters Panel */}
+              {showAdvancedFilters && (
+                <Card className="p-4 bg-muted/30 border-dashed">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Creator Address</label>
+                      <Input
+                        placeholder="0x... or partial address"
+                        value={creatorFilter}
+                        onChange={(e) => { setCreatorFilter(e.target.value); setCurrentPage(1); }}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Min Price (PM)</label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={minPrice}
+                        onChange={(e) => { setMinPrice(e.target.value); setCurrentPage(1); }}
+                        min="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Max Price (PM)</label>
+                      <Input
+                        type="number"
+                        placeholder="No limit"
+                        value={maxPrice}
+                        onChange={(e) => { setMaxPrice(e.target.value); setCurrentPage(1); }}
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {/* Category Filter Chips */}
               <div className="flex flex-wrap gap-2">
