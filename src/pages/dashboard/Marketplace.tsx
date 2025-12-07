@@ -13,12 +13,14 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ShoppingCart, TrendingUp, Package, ChevronLeft, ChevronRight, CheckCircle2, Gavel, History, Eye, Clock, User, Timer, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, ShoppingCart, TrendingUp, Package, ChevronLeft, ChevronRight, CheckCircle2, Gavel, History, Eye, Clock, User, Timer, Plus, Sparkles, Heart, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ipfsToHttp } from "@/utils/ipfsService";
 import { NFTImage } from "@/components/NFTImage";
 import { NFTSkeletonGrid, TrendingNFTSkeletonGrid, AnalyticsCardSkeleton } from "@/components/NFTSkeletonGrid";
+import { useNFTFavorites } from "@/hooks/useNFTFavorites";
+import { NFT_CATEGORIES } from "@/contracts/nftABI";
 
 interface MarketItem {
   id: number;
@@ -70,6 +72,9 @@ const MarketplacePage = () => {
   const [auctionDuration, setAuctionDuration] = useState("24");
   const [startingBid, setStartingBid] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const { favorites, toggleFavorite, isFavorite, favoritesCount } = useNFTFavorites();
   const itemsPerPage = 12;
 
   // Simulate initial loading
@@ -313,12 +318,31 @@ const MarketplacePage = () => {
     setIsAuctionListing(false);
   };
 
-  // Filter by search query
-  const filteredItems = allMarketItems.filter((item) =>
-    searchQuery.trim() === "" ||
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Handle favorite toggle
+  const handleToggleFavorite = (e: React.MouseEvent, item: MarketItem) => {
+    e.stopPropagation();
+    const added = toggleFavorite({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      category: item.category,
+      image: item.image,
+    });
+    toast.success(added ? `${item.name} added to favorites` : `${item.name} removed from favorites`);
+  };
+
+  // Filter by category, search query, and favorites
+  const filteredItems = allMarketItems.filter((item) => {
+    const matchesSearch = searchQuery.trim() === "" ||
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
+    
+    const matchesFavorites = !showFavoritesOnly || isFavorite(item.id);
+    
+    return matchesSearch && matchesCategory && matchesFavorites;
+  });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
     if (sortBy === "price-low") return a.price - b.price;
@@ -516,8 +540,12 @@ const MarketplacePage = () => {
           </Card>
 
           <Tabs defaultValue="browse" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="browse">Browse Marketplace</TabsTrigger>
+              <TabsTrigger value="favorites" className="flex items-center gap-2">
+                <Heart className="h-4 w-4" />
+                Favorites ({favoritesCount})
+              </TabsTrigger>
               <TabsTrigger value="owned">My NFTs ({ownedNFTs.length})</TabsTrigger>
             </TabsList>
 
@@ -559,6 +587,27 @@ const MarketplacePage = () => {
                 </div>
               </div>
 
+              {/* Category Filter Chips */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedCategory === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setSelectedCategory("all"); setCurrentPage(1); }}
+                >
+                  All Categories
+                </Button>
+                {NFT_CATEGORIES.map((category) => (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => { setSelectedCategory(category); setCurrentPage(1); }}
+                  >
+                    {category}
+                  </Button>
+                ))}
+              </div>
+
               {isLoading ? (
                 <NFTSkeletonGrid count={12} columns={4} />
               ) : (
@@ -573,6 +622,16 @@ const MarketplacePage = () => {
                             Auction
                           </Badge>
                         )}
+                        <button
+                          className={`absolute top-3 right-12 p-2 rounded-full z-10 transition-colors ${
+                            isFavorite(item.id) 
+                              ? "bg-red-500 text-white" 
+                              : "bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-red-500"
+                          }`}
+                          onClick={(e) => handleToggleFavorite(e, item)}
+                        >
+                          <Heart className={`h-4 w-4 ${isFavorite(item.id) ? "fill-current" : ""}`} />
+                        </button>
                         <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 z-10">
                           <Eye className="h-3 w-3" />
                           <span className="text-xs">{item.views}</span>
@@ -632,6 +691,49 @@ const MarketplacePage = () => {
                   <Button variant="outline" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="favorites" className="space-y-6">
+              {favorites.length === 0 ? (
+                <Card className="p-12 text-center">
+                  <Heart className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h3 className="text-xl font-bold mb-2">No Favorites Yet</h3>
+                  <p className="text-muted-foreground mb-6">Click the heart icon on NFTs to add them to your favorites</p>
+                  <Button variant="outline" onClick={() => document.querySelector<HTMLButtonElement>('[value="browse"]')?.click()}>
+                    Browse Marketplace
+                  </Button>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {favorites.map((item) => (
+                    <Card key={item.id} className="overflow-hidden hover:shadow-glow transition-all group">
+                      <div className="aspect-square bg-muted/50 relative overflow-hidden">
+                        <NFTImage src={item.image} alt={item.name} />
+                        <button
+                          className="absolute top-3 right-3 p-2 rounded-full z-10 bg-red-500 text-white"
+                          onClick={() => {
+                            toggleFavorite(item);
+                            toast.success(`${item.name} removed from favorites`);
+                          }}
+                        >
+                          <Heart className="h-4 w-4 fill-current" />
+                        </button>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <h3 className="font-bold mb-1">{item.name}</h3>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-primary font-bold">{item.price}</span>
+                          <img src={pmLogo} alt="PM" className="h-4 w-4" />
+                          <span className="text-primary font-bold">PM</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               )}
             </TabsContent>
