@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 const PMTOKEN_ADDRESS = PM_TOKEN_ADDRESS as `0x${string}`;
 const PMNFT_ADDRESS = getContractAddress(56, 'PMNFT') as `0x${string}`;
 
-// Updated interfaces to match optimized contract
+// Interfaces matching optimized contract struct field names
 export interface NFTMetadata {
   name: string;
   desc: string;
@@ -29,29 +29,49 @@ export interface NFTListing {
   active: boolean;
 }
 
+// Raw contract return types with shortened field names
+interface RawMetadata {
+  n: string;
+  d: string;
+  c: string;
+  r: bigint;
+  cr: `0x${string}`;
+  t: bigint;
+}
+
+interface RawListing {
+  s: `0x${string}`;
+  p: bigint;
+  x: boolean;
+  e: bigint;
+  b: `0x${string}`;
+  h: bigint;
+  a: boolean;
+}
+
 export function useNFTStats() {
   const { data: totalMinted, isLoading: totalMintedLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'getTotalMinted',
+    functionName: 'mCnt',
   });
 
   const { data: totalSupply, isLoading: totalSupplyLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'totalSupply',
+    functionName: 'getSt',
   });
 
   const { data: mintFee, isLoading: mintFeeLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'mintFee',
+    functionName: 'mFee',
   });
 
   const { data: platformFee, isLoading: platformFeeLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'platformFee',
+    functionName: 'pFee',
   });
 
   return {
@@ -67,12 +87,22 @@ export function useNFTMetadata(tokenId: number) {
   const { data, isLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'getMetadata',
+    functionName: 'getMs',
     args: [BigInt(tokenId)],
   });
 
+  // Map shortened field names to full names
+  const metadata = data ? {
+    name: (data as RawMetadata).n,
+    desc: (data as RawMetadata).d,
+    category: (data as RawMetadata).c,
+    royalty: (data as RawMetadata).r,
+    creator: (data as RawMetadata).cr,
+    time: (data as RawMetadata).t,
+  } as NFTMetadata : undefined;
+
   return {
-    metadata: data as NFTMetadata | undefined,
+    metadata,
     isLoading,
   };
 }
@@ -81,12 +111,23 @@ export function useNFTListing(tokenId: number) {
   const { data, isLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'getListing',
+    functionName: 'getLs',
     args: [BigInt(tokenId)],
   });
 
+  // Map shortened field names to full names
+  const listing = data ? {
+    seller: (data as RawListing).s,
+    price: (data as RawListing).p,
+    auction: (data as RawListing).x,
+    endTime: (data as RawListing).e,
+    bidder: (data as RawListing).b,
+    bid: (data as RawListing).h,
+    active: (data as RawListing).a,
+  } as NFTListing : undefined;
+
   return {
-    listing: data as NFTListing | undefined,
+    listing,
     isLoading,
   };
 }
@@ -182,7 +223,7 @@ export function useNFTMarketplace() {
   const { data: mintFee } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'mintFee',
+    functionName: 'mFee',
   });
 
   const mintNFT = async (
@@ -302,7 +343,7 @@ export function useNFTMarketplace() {
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
-        functionName: 'placeBid',
+        functionName: 'bid',
         args: [BigInt(tokenId), amount],
       } as any);
       toast.success('Bid placed successfully!');
@@ -323,7 +364,7 @@ export function useNFTMarketplace() {
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
-        functionName: 'listForSale',
+        functionName: 'sell',
         args: [BigInt(tokenId), parseEther(price)],
       } as any);
       toast.success('NFT listed for sale!');
@@ -344,7 +385,7 @@ export function useNFTMarketplace() {
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
-        functionName: 'listForAuction',
+        functionName: 'auction',
         args: [BigInt(tokenId), parseEther(startingPrice), BigInt(durationSeconds)],
       } as any);
       toast.success('NFT listed for auction!');
@@ -365,7 +406,7 @@ export function useNFTMarketplace() {
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
-        functionName: 'placeBid',
+        functionName: 'bid',
         args: [BigInt(tokenId), parseEther(amount)],
       } as any);
       toast.success('Bid placed successfully!');
@@ -407,7 +448,7 @@ export function useNFTMarketplace() {
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
         abi: PMNFTABI,
-        functionName: 'endAuction',
+        functionName: 'aEnd',
         args: [BigInt(tokenId)],
       } as any);
       toast.success('Auction ended!');
