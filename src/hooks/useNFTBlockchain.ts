@@ -1,10 +1,11 @@
 import { useReadContract, useAccount, usePublicClient } from 'wagmi';
-import { PMNFTABI } from '@/contracts/nftABI';
+import { PMNFTABI, PMMarketplaceABI } from '@/contracts/nftABI';
 import { getContractAddress } from '@/contracts/addresses';
 import { formatEther } from 'viem';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const PMNFT_ADDRESS = getContractAddress(56, 'PMNFT') as `0x${string}`;
+const PMMARKETPLACE_ADDRESS = getContractAddress(56, 'PMMarketplace') as `0x${string}`;
 
 export interface BlockchainNFT {
   id: number;
@@ -54,10 +55,11 @@ export interface NFTCollection {
 }
 
 export function useBlockchainStats() {
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useReadContract({
+  // NFT contract stats
+  const { data: totalMinted, isLoading: mintLoading, refetch: refetchMint } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'getSt',
+    functionName: 'tMint',
   });
 
   const { data: mintFee } = useReadContract({
@@ -66,25 +68,19 @@ export function useBlockchainStats() {
     functionName: 'mFee',
   });
 
-  const { data: platformFee } = useReadContract({
-    address: PMNFT_ADDRESS,
-    abi: PMNFTABI,
-    functionName: 'pFee',
-  });
-
-  const { data: isPaused } = useReadContract({
+  const { data: nftPaused } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
     functionName: 'paused',
   });
 
-  const { data: collector } = useReadContract({
+  const { data: nftCollector } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
     functionName: 'col',
   });
 
-  const { data: owner } = useReadContract({
+  const { data: nftOwner } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
     functionName: 'owner',
@@ -96,27 +92,67 @@ export function useBlockchainStats() {
     functionName: 'getCats',
   });
 
+  // Marketplace contract stats
+  const { data: marketplaceStats, isLoading: marketLoading, refetch: refetchMarket } = useReadContract({
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
+    functionName: 'getSt',
+  });
+
+  const { data: platformFee } = useReadContract({
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
+    functionName: 'pFee',
+  });
+
+  const { data: marketplacePaused } = useReadContract({
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
+    functionName: 'paused',
+  });
+
+  const { data: marketplaceCollector } = useReadContract({
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
+    functionName: 'col',
+  });
+
+  const { data: marketplaceOwner } = useReadContract({
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
+    functionName: 'owner',
+  });
+
   const parsedStats = useMemo(() => {
-    if (!stats) return null;
-    const s = stats as readonly [bigint, bigint, bigint, bigint];
+    if (!marketplaceStats) return null;
+    const s = marketplaceStats as readonly [bigint, bigint, bigint];
     return {
-      totalMinted: Number(s[0]),
-      totalListings: Number(s[1]),
-      totalSales: Number(s[2]),
-      totalVolume: formatEther(s[3]),
+      totalMinted: totalMinted ? Number(totalMinted) : 0,
+      totalListings: Number(s[0]),
+      totalSales: Number(s[1]),
+      totalVolume: formatEther(s[2]),
     };
-  }, [stats]);
+  }, [marketplaceStats, totalMinted]);
+
+  const refetch = useCallback(() => {
+    refetchMint();
+    refetchMarket();
+  }, [refetchMint, refetchMarket]);
 
   return {
     stats: parsedStats,
     mintFee: mintFee ? formatEther(mintFee as bigint) : '10000',
     platformFee: platformFee ? Number(platformFee) : 2,
-    isPaused: (isPaused as boolean) ?? false,
-    collector: (collector as string) ?? '',
-    owner: (owner as string) ?? '',
+    isPaused: (nftPaused as boolean) || (marketplacePaused as boolean) || false,
+    nftPaused: (nftPaused as boolean) ?? false,
+    marketplacePaused: (marketplacePaused as boolean) ?? false,
+    collector: (nftCollector as string) ?? '',
+    marketplaceCollector: (marketplaceCollector as string) ?? '',
+    owner: (nftOwner as string) ?? '',
+    marketplaceOwner: (marketplaceOwner as string) ?? '',
     categories: (categories as string[]) ?? [],
-    isLoading: statsLoading,
-    refetch: refetchStats,
+    isLoading: mintLoading || marketLoading,
+    refetch,
   };
 }
 
@@ -146,33 +182,38 @@ export function useMarketplaceNFTs() {
 
       const nfts: BlockchainNFT[] = [];
       const client = publicClient as any;
-      const contractParams = { address: PMNFT_ADDRESS, abi: PMNFTABI };
 
-      for (let tokenId = 1; tokenId <= totalMinted; tokenId++) {
+      for (let tokenId = 0; tokenId < totalMinted; tokenId++) {
         try {
+          // Fetch metadata from NFT contract
           const metadata = await client.readContract({
-            ...contractParams,
+            address: PMNFT_ADDRESS,
+            abi: PMNFTABI,
             functionName: 'getMs',
             args: [BigInt(tokenId)],
           }) as { n: string; d: string; c: string; r: bigint; cr: `0x${string}`; t: bigint };
 
-          const listing = await client.readContract({
-            ...contractParams,
-            functionName: 'getLs',
-            args: [BigInt(tokenId)],
-          }) as { s: `0x${string}`; p: bigint; a: boolean; e: bigint; b: `0x${string}`; h: bigint; x: boolean };
-
           const owner = await client.readContract({
-            ...contractParams,
+            address: PMNFT_ADDRESS,
+            abi: PMNFTABI,
             functionName: 'ownerOf',
             args: [BigInt(tokenId)],
           }) as `0x${string}`;
 
           const tokenURI = await client.readContract({
-            ...contractParams,
+            address: PMNFT_ADDRESS,
+            abi: PMNFTABI,
             functionName: 'tokenURI',
             args: [BigInt(tokenId)],
           }) as string;
+
+          // Fetch listing from Marketplace contract
+          const listing = await client.readContract({
+            address: PMMARKETPLACE_ADDRESS,
+            abi: PMMarketplaceABI,
+            functionName: 'getLs',
+            args: [BigInt(tokenId)],
+          }) as { s: `0x${string}`; p: bigint; a: boolean; e: bigint; b: `0x${string}`; h: bigint; x: boolean };
 
           nfts.push({
             id: tokenId,
@@ -234,21 +275,24 @@ export function useNFTActivity(limit: number = 50) {
       const fromBlock = blockNumber > 10000n ? blockNumber - 10000n : 0n;
       const client = publicClient as any;
 
-      const [mintLogs, saleLogs, bidLogs] = await Promise.all([
+      // Fetch mint events from NFT contract
+      const mintLogs = await client.getLogs({
+        address: PMNFT_ADDRESS,
+        event: { type: 'event', name: 'Mint', inputs: [
+          { indexed: true, name: 'i', type: 'uint256' },
+          { indexed: true, name: 'c', type: 'address' },
+          { indexed: false, name: 'n', type: 'string' },
+          { indexed: false, name: 'ct', type: 'string' },
+          { indexed: false, name: 'r', type: 'uint256' },
+        ]},
+        fromBlock,
+        toBlock: 'latest',
+      }).catch(() => []);
+
+      // Fetch sale and bid events from Marketplace contract
+      const [saleLogs, bidLogs] = await Promise.all([
         client.getLogs({
-          address: PMNFT_ADDRESS,
-          event: { type: 'event', name: 'Mint', inputs: [
-            { indexed: true, name: 'i', type: 'uint256' },
-            { indexed: true, name: 'c', type: 'address' },
-            { indexed: false, name: 'n', type: 'string' },
-            { indexed: false, name: 'ct', type: 'string' },
-            { indexed: false, name: 'r', type: 'uint256' },
-          ]},
-          fromBlock,
-          toBlock: 'latest',
-        }).catch(() => []),
-        client.getLogs({
-          address: PMNFT_ADDRESS,
+          address: PMMARKETPLACE_ADDRESS,
           event: { type: 'event', name: 'Sale', inputs: [
             { indexed: true, name: 'i', type: 'uint256' },
             { indexed: true, name: 's', type: 'address' },
@@ -259,7 +303,7 @@ export function useNFTActivity(limit: number = 50) {
           toBlock: 'latest',
         }).catch(() => []),
         client.getLogs({
-          address: PMNFT_ADDRESS,
+          address: PMMARKETPLACE_ADDRESS,
           event: { type: 'event', name: 'Bid', inputs: [
             { indexed: true, name: 'i', type: 'uint256' },
             { indexed: true, name: 'b', type: 'address' },

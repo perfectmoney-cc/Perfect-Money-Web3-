@@ -1,5 +1,5 @@
 import { useReadContract, useAccount, useWriteContract } from 'wagmi';
-import { PMNFTABI } from '@/contracts/nftABI';
+import { PMNFTABI, PMMarketplaceABI } from '@/contracts/nftABI';
 import { PMTokenABI } from '@/contracts/abis';
 import { getContractAddress, PM_TOKEN_ADDRESS } from '@/contracts/addresses';
 import { parseEther, formatEther, maxUint256 } from 'viem';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 const PMTOKEN_ADDRESS = PM_TOKEN_ADDRESS as `0x${string}`;
 const PMNFT_ADDRESS = getContractAddress(56, 'PMNFT') as `0x${string}`;
+const PMMARKETPLACE_ADDRESS = getContractAddress(56, 'PMMarketplace') as `0x${string}`;
 
 // Interfaces matching optimized contract struct field names
 export interface NFTMetadata {
@@ -42,24 +43,19 @@ interface RawMetadata {
 interface RawListing {
   s: `0x${string}`;
   p: bigint;
-  x: boolean;
+  a: boolean;
   e: bigint;
   b: `0x${string}`;
   h: bigint;
-  a: boolean;
+  x: boolean;
 }
 
 export function useNFTStats() {
+  // From NFT contract
   const { data: totalMinted, isLoading: totalMintedLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'mCnt',
-  });
-
-  const { data: totalSupply, isLoading: totalSupplyLoading } = useReadContract({
-    address: PMNFT_ADDRESS,
-    abi: PMNFTABI,
-    functionName: 'getSt',
+    functionName: 'tMint',
   });
 
   const { data: mintFee, isLoading: mintFeeLoading } = useReadContract({
@@ -68,18 +64,30 @@ export function useNFTStats() {
     functionName: 'mFee',
   });
 
+  // From Marketplace contract
+  const { data: marketplaceStats, isLoading: marketplaceStatsLoading } = useReadContract({
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
+    functionName: 'getSt',
+  });
+
   const { data: platformFee, isLoading: platformFeeLoading } = useReadContract({
-    address: PMNFT_ADDRESS,
-    abi: PMNFTABI,
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
     functionName: 'pFee',
   });
 
+  // Parse marketplace stats (tList, tSale, tVol)
+  const stats = marketplaceStats as readonly [bigint, bigint, bigint] | undefined;
+
   return {
     totalMinted: totalMinted ? Number(totalMinted) : 0,
-    totalSupply: totalSupply ? Number(totalSupply) : 0,
+    totalListings: stats ? Number(stats[0]) : 0,
+    totalSales: stats ? Number(stats[1]) : 0,
+    totalVolume: stats ? formatEther(stats[2]) : '0',
     mintingFee: mintFee ? formatEther(mintFee as bigint) : '10000',
     platformFeePercent: platformFee ? Number(platformFee) : 2,
-    isLoading: totalMintedLoading || totalSupplyLoading || mintFeeLoading || platformFeeLoading,
+    isLoading: totalMintedLoading || mintFeeLoading || marketplaceStatsLoading || platformFeeLoading,
   };
 }
 
@@ -109,8 +117,8 @@ export function useNFTMetadata(tokenId: number) {
 
 export function useNFTListing(tokenId: number) {
   const { data, isLoading } = useReadContract({
-    address: PMNFT_ADDRESS,
-    abi: PMNFTABI,
+    address: PMMARKETPLACE_ADDRESS,
+    abi: PMMarketplaceABI,
     functionName: 'getLs',
     args: [BigInt(tokenId)],
   });
@@ -119,11 +127,11 @@ export function useNFTListing(tokenId: number) {
   const listing = data ? {
     seller: (data as RawListing).s,
     price: (data as RawListing).p,
-    auction: (data as RawListing).x,
+    auction: (data as RawListing).a,
     endTime: (data as RawListing).e,
     bidder: (data as RawListing).b,
     bid: (data as RawListing).h,
-    active: (data as RawListing).a,
+    active: (data as RawListing).x,
   } as NFTListing : undefined;
 
   return {
@@ -158,11 +166,20 @@ export function useTokenApproval() {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
   
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+  // For minting - approve NFT contract
+  const { data: nftAllowance, refetch: refetchNFTAllowance } = useReadContract({
     address: PMTOKEN_ADDRESS,
     abi: PMTokenABI,
     functionName: 'allowance',
     args: address ? [address, PMNFT_ADDRESS] : undefined,
+  });
+
+  // For marketplace purchases - approve Marketplace contract
+  const { data: marketplaceAllowance, refetch: refetchMarketplaceAllowance } = useReadContract({
+    address: PMTOKEN_ADDRESS,
+    abi: PMTokenABI,
+    functionName: 'allowance',
+    args: address ? [address, PMMARKETPLACE_ADDRESS] : undefined,
   });
 
   const { data: balance, refetch: refetchBalance } = useReadContract({
@@ -172,19 +189,24 @@ export function useTokenApproval() {
     args: address ? [address] : undefined,
   });
 
-  const checkAllowance = (requiredAmount: bigint): boolean => {
-    if (!allowance) return false;
-    return (allowance as bigint) >= requiredAmount;
+  const checkNFTAllowance = (requiredAmount: bigint): boolean => {
+    if (!nftAllowance) return false;
+    return (nftAllowance as bigint) >= requiredAmount;
   };
 
-  const approvePMToken = async (amount: bigint) => {
+  const checkMarketplaceAllowance = (requiredAmount: bigint): boolean => {
+    if (!marketplaceAllowance) return false;
+    return (marketplaceAllowance as bigint) >= requiredAmount;
+  };
+
+  const approvePMTokenForNFT = async (amount: bigint) => {
     if (!address) {
       toast.error('Please connect your wallet');
       return;
     }
     
     try {
-      toast.info('Approving PM tokens...');
+      toast.info('Approving PM tokens for NFT minting...');
       const hash = await writeContractAsync({
         address: PMTOKEN_ADDRESS,
         abi: PMTokenABI,
@@ -192,7 +214,7 @@ export function useTokenApproval() {
         args: [PMNFT_ADDRESS, amount],
       } as any);
       toast.success('PM tokens approved!');
-      await refetchAllowance();
+      await refetchNFTAllowance();
       return hash;
     } catch (error: any) {
       toast.error(error?.message || 'Approval failed');
@@ -200,17 +222,62 @@ export function useTokenApproval() {
     }
   };
 
-  const approveMaxPMToken = async () => {
-    return approvePMToken(maxUint256);
+  const approvePMTokenForMarketplace = async (amount: bigint) => {
+    if (!address) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+    
+    try {
+      toast.info('Approving PM tokens for marketplace...');
+      const hash = await writeContractAsync({
+        address: PMTOKEN_ADDRESS,
+        abi: PMTokenABI,
+        functionName: 'approve',
+        args: [PMMARKETPLACE_ADDRESS, amount],
+      } as any);
+      toast.success('PM tokens approved!');
+      await refetchMarketplaceAllowance();
+      return hash;
+    } catch (error: any) {
+      toast.error(error?.message || 'Approval failed');
+      throw error;
+    }
+  };
+
+  const approveNFTForMarketplace = async () => {
+    if (!address) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+    
+    try {
+      toast.info('Approving NFT for marketplace...');
+      const hash = await writeContractAsync({
+        address: PMNFT_ADDRESS,
+        abi: PMNFTABI,
+        functionName: 'setApprovalForAll',
+        args: [PMMARKETPLACE_ADDRESS, true],
+      } as any);
+      toast.success('NFT approved for marketplace!');
+      return hash;
+    } catch (error: any) {
+      toast.error(error?.message || 'Approval failed');
+      throw error;
+    }
   };
 
   return {
-    allowance: allowance as bigint | undefined,
+    nftAllowance: nftAllowance as bigint | undefined,
+    marketplaceAllowance: marketplaceAllowance as bigint | undefined,
     balance: balance as bigint | undefined,
-    checkAllowance,
-    approvePMToken,
-    approveMaxPMToken,
-    refetchAllowance,
+    checkNFTAllowance,
+    checkMarketplaceAllowance,
+    approvePMTokenForNFT,
+    approvePMTokenForMarketplace,
+    approveNFTForMarketplace,
+    refetchNFTAllowance,
+    refetchMarketplaceAllowance,
     refetchBalance,
   };
 }
@@ -218,7 +285,15 @@ export function useTokenApproval() {
 export function useNFTMarketplace() {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
-  const { approvePMToken, checkAllowance, refetchAllowance } = useTokenApproval();
+  const { 
+    approvePMTokenForNFT, 
+    approvePMTokenForMarketplace, 
+    approveNFTForMarketplace,
+    checkNFTAllowance, 
+    checkMarketplaceAllowance,
+    refetchNFTAllowance,
+    refetchMarketplaceAllowance 
+  } = useTokenApproval();
 
   const { data: mintFee } = useReadContract({
     address: PMNFT_ADDRESS,
@@ -241,10 +316,10 @@ export function useNFTMarketplace() {
     try {
       const fee = mintFee as bigint || parseEther('10000');
       
-      if (!checkAllowance(fee)) {
+      if (!checkNFTAllowance(fee)) {
         toast.info('Step 1/2: Approving PM tokens for minting fee...');
-        await approvePMToken(fee);
-        await refetchAllowance();
+        await approvePMTokenForNFT(fee);
+        await refetchNFTAllowance();
       }
 
       toast.info('Step 2/2: Minting NFT...');
@@ -269,16 +344,16 @@ export function useNFTMarketplace() {
     }
     
     try {
-      if (!checkAllowance(price)) {
+      if (!checkMarketplaceAllowance(price)) {
         toast.info('Step 1/2: Approving PM tokens for purchase...');
-        await approvePMToken(price);
-        await refetchAllowance();
+        await approvePMTokenForMarketplace(price);
+        await refetchMarketplaceAllowance();
       }
 
       toast.info('Step 2/2: Completing purchase...');
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
         functionName: 'buy',
         args: [BigInt(tokenId)],
       } as any);
@@ -304,13 +379,13 @@ export function useNFTMarketplace() {
         address: PMTOKEN_ADDRESS,
         abi: PMTokenABI,
         functionName: 'approve',
-        args: [PMNFT_ADDRESS, price],
+        args: [PMMARKETPLACE_ADDRESS, price],
       } as any);
 
       toast.info('Step 2/2: Completing purchase...');
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
         functionName: 'buy',
         args: [BigInt(tokenId)],
       } as any);
@@ -336,13 +411,13 @@ export function useNFTMarketplace() {
         address: PMTOKEN_ADDRESS,
         abi: PMTokenABI,
         functionName: 'approve',
-        args: [PMNFT_ADDRESS, amount],
+        args: [PMMARKETPLACE_ADDRESS, amount],
       } as any);
 
       toast.info('Step 2/2: Placing bid...');
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
         functionName: 'bid',
         args: [BigInt(tokenId), amount],
       } as any);
@@ -361,10 +436,15 @@ export function useNFTMarketplace() {
     }
     
     try {
+      // First approve marketplace to transfer NFT
+      toast.info('Step 1/2: Approving NFT for marketplace...');
+      await approveNFTForMarketplace();
+
+      toast.info('Step 2/2: Listing NFT for sale...');
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
-        functionName: 'sell',
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
+        functionName: 'listSale',
         args: [BigInt(tokenId), parseEther(price)],
       } as any);
       toast.success('NFT listed for sale!');
@@ -382,10 +462,15 @@ export function useNFTMarketplace() {
     }
     
     try {
+      // First approve marketplace to transfer NFT
+      toast.info('Step 1/2: Approving NFT for marketplace...');
+      await approveNFTForMarketplace();
+
+      toast.info('Step 2/2: Listing NFT for auction...');
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
-        functionName: 'auction',
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
+        functionName: 'listAuct',
         args: [BigInt(tokenId), parseEther(startingPrice), BigInt(durationSeconds)],
       } as any);
       toast.success('NFT listed for auction!');
@@ -403,11 +488,20 @@ export function useNFTMarketplace() {
     }
     
     try {
+      const bidAmount = parseEther(amount);
+      
+      if (!checkMarketplaceAllowance(bidAmount)) {
+        toast.info('Step 1/2: Approving PM tokens for bid...');
+        await approvePMTokenForMarketplace(bidAmount);
+        await refetchMarketplaceAllowance();
+      }
+
+      toast.info('Placing bid...');
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
         functionName: 'bid',
-        args: [BigInt(tokenId), parseEther(amount)],
+        args: [BigInt(tokenId), bidAmount],
       } as any);
       toast.success('Bid placed successfully!');
       return hash;
@@ -425,8 +519,8 @@ export function useNFTMarketplace() {
     
     try {
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
         functionName: 'delist',
         args: [BigInt(tokenId)],
       } as any);
@@ -446,9 +540,9 @@ export function useNFTMarketplace() {
     
     try {
       const hash = await writeContractAsync({
-        address: PMNFT_ADDRESS,
-        abi: PMNFTABI,
-        functionName: 'aEnd',
+        address: PMMARKETPLACE_ADDRESS,
+        abi: PMMarketplaceABI,
+        functionName: 'endAuct',
         args: [BigInt(tokenId)],
       } as any);
       toast.success('Auction ended!');
