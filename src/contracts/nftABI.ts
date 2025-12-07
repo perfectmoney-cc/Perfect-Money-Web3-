@@ -1,19 +1,19 @@
-// PMNFT Contract ABI - Updated for enhanced marketplace functionality
+// PMNFT Contract ABI - Optimized for size
 export const PMNFTABI = [
-  // ============ Read Functions ============
+  // Read Functions
   { inputs: [], name: "name", outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "symbol", outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "pmToken", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "mintingFee", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "platformFeePercent", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "feeCollector", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "mintFee", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "platformFee", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "collector", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "owner", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "totalSupply", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "paused", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "MAX_ROYALTY_PERCENT", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "MAX_PLATFORM_FEE", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "MIN_AUCTION_DURATION", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "MAX_AUCTION_DURATION", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "MAX_ROYALTY", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "MAX_FEE", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "MIN_AUCTION", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "MAX_AUCTION", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   
   // Token queries
   { inputs: [{ name: "tokenId", type: "uint256" }], name: "ownerOf", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
@@ -23,26 +23,22 @@ export const PMNFTABI = [
   { inputs: [{ name: "index", type: "uint256" }], name: "tokenByIndex", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "getTotalMinted", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "getCategories", outputs: [{ type: "string[]" }], stateMutability: "view", type: "function" },
-  { inputs: [{ name: "category", type: "string" }], name: "isValidCategory", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "category", type: "string" }], name: "validCategory", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "minter", type: "address" }], name: "getMinted", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "minter", type: "address" }], name: "minted", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "tokenId", type: "uint256" }], name: "auctionEnded", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "tokenId", type: "uint256" }], name: "timeLeft", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   
-  // Minter stats
-  { inputs: [{ name: "minter", type: "address" }], name: "getMintedByAddress", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [{ name: "minter", type: "address" }], name: "mintedByAddress", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  
-  // Auction helpers
-  { inputs: [{ name: "tokenId", type: "uint256" }], name: "isAuctionEnded", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
-  { inputs: [{ name: "tokenId", type: "uint256" }], name: "getAuctionTimeRemaining", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-  
-  // Marketplace stats struct
+  // Stats
   { 
     inputs: [], 
-    name: "getMarketplaceStats", 
+    name: "getStats", 
     outputs: [{ 
       components: [
-        { name: "totalMinted", type: "uint256" },
-        { name: "totalListings", type: "uint256" },
-        { name: "totalSales", type: "uint256" },
-        { name: "totalVolume", type: "uint256" }
+        { name: "minted", type: "uint256" },
+        { name: "listings", type: "uint256" },
+        { name: "sales", type: "uint256" },
+        { name: "volume", type: "uint256" }
       ],
       type: "tuple"
     }], 
@@ -50,7 +46,7 @@ export const PMNFTABI = [
     type: "function" 
   },
   
-  // Listing struct view
+  // Listing
   { 
     inputs: [{ name: "tokenId", type: "uint256" }], 
     name: "getListing", 
@@ -58,11 +54,11 @@ export const PMNFTABI = [
       components: [
         { name: "seller", type: "address" },
         { name: "price", type: "uint256" },
-        { name: "isAuction", type: "bool" },
-        { name: "auctionEndTime", type: "uint256" },
-        { name: "highestBidder", type: "address" },
-        { name: "highestBid", type: "uint256" },
-        { name: "isActive", type: "bool" }
+        { name: "auction", type: "bool" },
+        { name: "endTime", type: "uint256" },
+        { name: "bidder", type: "address" },
+        { name: "bid", type: "uint256" },
+        { name: "active", type: "bool" }
       ],
       type: "tuple"
     }], 
@@ -70,18 +66,18 @@ export const PMNFTABI = [
     type: "function" 
   },
   
-  // NFT Metadata struct view
+  // Metadata
   { 
     inputs: [{ name: "tokenId", type: "uint256" }], 
     name: "getMetadata", 
     outputs: [{ 
       components: [
         { name: "name", type: "string" },
-        { name: "description", type: "string" },
+        { name: "desc", type: "string" },
         { name: "category", type: "string" },
-        { name: "royaltyPercent", type: "uint256" },
+        { name: "royalty", type: "uint256" },
         { name: "creator", type: "address" },
-        { name: "mintedAt", type: "uint256" }
+        { name: "time", type: "uint256" }
       ],
       type: "tuple"
     }], 
@@ -89,18 +85,18 @@ export const PMNFTABI = [
     type: "function" 
   },
   
-  // Direct mapping access
+  // Direct mappings
   { 
     inputs: [{ name: "tokenId", type: "uint256" }], 
     name: "listings", 
     outputs: [
       { name: "seller", type: "address" },
       { name: "price", type: "uint256" },
-      { name: "isAuction", type: "bool" },
-      { name: "auctionEndTime", type: "uint256" },
-      { name: "highestBidder", type: "address" },
-      { name: "highestBid", type: "uint256" },
-      { name: "isActive", type: "bool" }
+      { name: "auction", type: "bool" },
+      { name: "endTime", type: "uint256" },
+      { name: "bidder", type: "address" },
+      { name: "bid", type: "uint256" },
+      { name: "active", type: "bool" }
     ], 
     stateMutability: "view", 
     type: "function" 
@@ -108,29 +104,27 @@ export const PMNFTABI = [
   
   { 
     inputs: [{ name: "tokenId", type: "uint256" }], 
-    name: "nftMetadata", 
+    name: "meta", 
     outputs: [
       { name: "name", type: "string" },
-      { name: "description", type: "string" },
+      { name: "desc", type: "string" },
       { name: "category", type: "string" },
-      { name: "royaltyPercent", type: "uint256" },
+      { name: "royalty", type: "uint256" },
       { name: "creator", type: "address" },
-      { name: "mintedAt", type: "uint256" }
+      { name: "time", type: "uint256" }
     ], 
     stateMutability: "view", 
     type: "function" 
   },
   
-  // ============ Write Functions ============
-  
-  // Minting
+  // Write Functions
   { 
     inputs: [
-      { name: "_tokenURI", type: "string" },
-      { name: "_name", type: "string" },
-      { name: "_description", type: "string" },
-      { name: "_category", type: "string" },
-      { name: "_royaltyPercent", type: "uint256" }
+      { name: "uri", type: "string" },
+      { name: "name", type: "string" },
+      { name: "desc", type: "string" },
+      { name: "cat", type: "string" },
+      { name: "royalty", type: "uint256" }
     ], 
     name: "mint", 
     outputs: [{ type: "uint256" }], 
@@ -138,203 +132,74 @@ export const PMNFTABI = [
     type: "function" 
   },
   
-  // Listing
-  { 
-    inputs: [
-      { name: "_tokenId", type: "uint256" },
-      { name: "_price", type: "uint256" }
-    ], 
-    name: "listForSale", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
+  { inputs: [{ name: "id", type: "uint256" }, { name: "price", type: "uint256" }], name: "listForSale", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "id", type: "uint256" }, { name: "startPrice", type: "uint256" }, { name: "dur", type: "uint256" }], name: "listForAuction", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "id", type: "uint256" }], name: "delist", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "id", type: "uint256" }], name: "buy", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "id", type: "uint256" }, { name: "amt", type: "uint256" }], name: "placeBid", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "id", type: "uint256" }], name: "endAuction", outputs: [], stateMutability: "nonpayable", type: "function" },
   
-  { 
-    inputs: [
-      { name: "_tokenId", type: "uint256" },
-      { name: "_startingPrice", type: "uint256" },
-      { name: "_duration", type: "uint256" }
-    ], 
-    name: "listForAuction", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
+  // ERC721 Standard
+  { inputs: [{ name: "to", type: "address" }, { name: "tokenId", type: "uint256" }], name: "approve", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "from", type: "address" }, { name: "to", type: "address" }, { name: "tokenId", type: "uint256" }], name: "transferFrom", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "from", type: "address" }, { name: "to", type: "address" }, { name: "tokenId", type: "uint256" }], name: "safeTransferFrom", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "from", type: "address" }, { name: "to", type: "address" }, { name: "tokenId", type: "uint256" }, { name: "data", type: "bytes" }], name: "safeTransferFrom", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "operator", type: "address" }, { name: "approved", type: "bool" }], name: "setApprovalForAll", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "tokenId", type: "uint256" }], name: "getApproved", outputs: [{ type: "address" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "owner", type: "address" }, { name: "operator", type: "address" }], name: "isApprovedForAll", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   
-  { 
-    inputs: [{ name: "_tokenId", type: "uint256" }], 
-    name: "delist", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  // Trading
-  { 
-    inputs: [{ name: "_tokenId", type: "uint256" }], 
-    name: "buy", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [
-      { name: "_tokenId", type: "uint256" },
-      { name: "_amount", type: "uint256" }
-    ], 
-    name: "placeBid", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [{ name: "_tokenId", type: "uint256" }], 
-    name: "endAuction", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  // ============ ERC721 Standard Functions ============
-  
-  { 
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "tokenId", type: "uint256" }
-    ], 
-    name: "approve", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "tokenId", type: "uint256" }
-    ], 
-    name: "transferFrom", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "tokenId", type: "uint256" }
-    ], 
-    name: "safeTransferFrom", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "tokenId", type: "uint256" },
-      { name: "data", type: "bytes" }
-    ], 
-    name: "safeTransferFrom", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [
-      { name: "operator", type: "address" },
-      { name: "approved", type: "bool" }
-    ], 
-    name: "setApprovalForAll", 
-    outputs: [], 
-    stateMutability: "nonpayable", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [{ name: "tokenId", type: "uint256" }], 
-    name: "getApproved", 
-    outputs: [{ type: "address" }], 
-    stateMutability: "view", 
-    type: "function" 
-  },
-  
-  { 
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "operator", type: "address" }
-    ], 
-    name: "isApprovedForAll", 
-    outputs: [{ type: "bool" }], 
-    stateMutability: "view", 
-    type: "function" 
-  },
-  
-  // ============ Admin Functions ============
-  
-  { inputs: [{ name: "_fee", type: "uint256" }], name: "setMintingFee", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [{ name: "_percent", type: "uint256" }], name: "setPlatformFee", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [{ name: "_collector", type: "address" }], name: "setFeeCollector", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [{ name: "_amount", type: "uint256" }], name: "emergencyWithdraw", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [{ name: "_category", type: "string" }], name: "addCategory", outputs: [], stateMutability: "nonpayable", type: "function" },
+  // Admin Functions
+  { inputs: [{ name: "f", type: "uint256" }], name: "setMintFee", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "p", type: "uint256" }], name: "setPlatformFee", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "c", type: "address" }], name: "setCollector", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "a", type: "uint256" }], name: "withdraw", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "c", type: "string" }], name: "addCategory", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [], name: "pause", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [], name: "unpause", outputs: [], stateMutability: "nonpayable", type: "function" },
   
-  // ============ Events ============
-  
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "creator", type: "address" }, { indexed: false, name: "name", type: "string" }, { indexed: false, name: "category", type: "string" }, { indexed: false, name: "royaltyPercent", type: "uint256" }], name: "NFTMinted", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "seller", type: "address" }, { indexed: false, name: "price", type: "uint256" }, { indexed: false, name: "isAuction", type: "bool" }, { indexed: false, name: "auctionEndTime", type: "uint256" }], name: "NFTListed", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "seller", type: "address" }], name: "NFTDelisted", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "seller", type: "address" }, { indexed: true, name: "buyer", type: "address" }, { indexed: false, name: "price", type: "uint256" }, { indexed: false, name: "platformFee", type: "uint256" }, { indexed: false, name: "royalty", type: "uint256" }], name: "NFTSold", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "bidder", type: "address" }, { indexed: false, name: "amount", type: "uint256" }, { indexed: false, name: "previousBidder", type: "address" }], name: "BidPlaced", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "winner", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "AuctionEnded", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "tokenId", type: "uint256" }, { indexed: true, name: "bidder", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "BidRefunded", type: "event" },
-  { anonymous: false, inputs: [{ indexed: false, name: "oldFee", type: "uint256" }, { indexed: false, name: "newFee", type: "uint256" }], name: "MintingFeeUpdated", type: "event" },
-  { anonymous: false, inputs: [{ indexed: false, name: "oldPercent", type: "uint256" }, { indexed: false, name: "newPercent", type: "uint256" }], name: "PlatformFeeUpdated", type: "event" },
-  { anonymous: false, inputs: [{ indexed: false, name: "oldCollector", type: "address" }, { indexed: false, name: "newCollector", type: "address" }], name: "FeeCollectorUpdated", type: "event" },
-  { anonymous: false, inputs: [{ indexed: false, name: "category", type: "string" }], name: "CategoryAdded", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, name: "to", type: "address" }, { indexed: false, name: "amount", type: "uint256" }], name: "EmergencyWithdraw", type: "event" },
+  // Events
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "creator", type: "address" }, { indexed: false, name: "name", type: "string" }, { indexed: false, name: "cat", type: "string" }, { indexed: false, name: "royalty", type: "uint256" }], name: "Mint", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "seller", type: "address" }, { indexed: false, name: "price", type: "uint256" }, { indexed: false, name: "auction", type: "bool" }, { indexed: false, name: "end", type: "uint256" }], name: "List", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "seller", type: "address" }], name: "Delist", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "seller", type: "address" }, { indexed: true, name: "buyer", type: "address" }, { indexed: false, name: "price", type: "uint256" }, { indexed: false, name: "fee", type: "uint256" }, { indexed: false, name: "royalty", type: "uint256" }], name: "Sale", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "bidder", type: "address" }, { indexed: false, name: "amt", type: "uint256" }, { indexed: false, name: "prev", type: "address" }], name: "Bid", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "winner", type: "address" }, { indexed: false, name: "amt", type: "uint256" }], name: "AuctionEnd", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "id", type: "uint256" }, { indexed: true, name: "bidder", type: "address" }, { indexed: false, name: "amt", type: "uint256" }], name: "Refund", type: "event" },
+  { anonymous: false, inputs: [{ indexed: false, name: "old", type: "uint256" }, { indexed: false, name: "next", type: "uint256" }], name: "FeeUpdate", type: "event" },
+  { anonymous: false, inputs: [{ indexed: false, name: "old", type: "uint256" }, { indexed: false, name: "next", type: "uint256" }], name: "PlatformFeeUpdate", type: "event" },
+  { anonymous: false, inputs: [{ indexed: false, name: "old", type: "address" }, { indexed: false, name: "next", type: "address" }], name: "CollectorUpdate", type: "event" },
+  { anonymous: false, inputs: [{ indexed: false, name: "cat", type: "string" }], name: "CategoryAdd", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, name: "to", type: "address" }, { indexed: false, name: "amt", type: "uint256" }], name: "Withdraw", type: "event" },
   { anonymous: false, inputs: [{ indexed: false, name: "account", type: "address" }], name: "Paused", type: "event" },
   { anonymous: false, inputs: [{ indexed: false, name: "account", type: "address" }], name: "Unpaused", type: "event" },
-  
-  // ERC721 Events
   { anonymous: false, inputs: [{ indexed: true, name: "from", type: "address" }, { indexed: true, name: "to", type: "address" }, { indexed: true, name: "tokenId", type: "uint256" }], name: "Transfer", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, name: "owner", type: "address" }, { indexed: true, name: "approved", type: "address" }, { indexed: true, name: "tokenId", type: "uint256" }], name: "Approval", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, name: "owner", type: "address" }, { indexed: true, name: "operator", type: "address" }, { indexed: false, name: "approved", type: "bool" }], name: "ApprovalForAll", type: "event" },
   
-  // ============ Custom Errors ============
-  
-  { inputs: [], name: "ZeroAddress", type: "error" },
-  { inputs: [{ name: "required", type: "uint256" }, { name: "available", type: "uint256" }], name: "InsufficientBalance", type: "error" },
-  { inputs: [{ name: "required", type: "uint256" }, { name: "available", type: "uint256" }], name: "InsufficientAllowance", type: "error" },
-  { inputs: [], name: "NotTokenOwner", type: "error" },
+  // Errors
+  { inputs: [], name: "Zero", type: "error" },
+  { inputs: [{ name: "need", type: "uint256" }, { name: "have", type: "uint256" }], name: "LowBal", type: "error" },
+  { inputs: [{ name: "need", type: "uint256" }, { name: "have", type: "uint256" }], name: "LowAllow", type: "error" },
+  { inputs: [], name: "NotOwner", type: "error" },
   { inputs: [], name: "NotListed", type: "error" },
-  { inputs: [], name: "AlreadyListed", type: "error" },
-  { inputs: [], name: "InvalidPrice", type: "error" },
-  { inputs: [], name: "InvalidRoyalty", type: "error" },
-  { inputs: [], name: "InvalidCategory", type: "error" },
-  { inputs: [], name: "InvalidDuration", type: "error" },
-  { inputs: [], name: "AuctionNotEnded", type: "error" },
-  { inputs: [], name: "AuctionAlreadyEnded", type: "error" },
-  { inputs: [{ name: "minRequired", type: "uint256" }, { name: "provided", type: "uint256" }], name: "BidTooLow", type: "error" },
+  { inputs: [], name: "Listed", type: "error" },
+  { inputs: [], name: "BadPrice", type: "error" },
+  { inputs: [], name: "BadRoyalty", type: "error" },
+  { inputs: [], name: "BadCategory", type: "error" },
+  { inputs: [], name: "BadDuration", type: "error" },
+  { inputs: [], name: "NotEnded", type: "error" },
+  { inputs: [], name: "Ended", type: "error" },
+  { inputs: [{ name: "min", type: "uint256" }, { name: "got", type: "uint256" }], name: "LowBid", type: "error" },
   { inputs: [], name: "NotAuction", type: "error" },
   { inputs: [], name: "IsAuction", type: "error" },
-  { inputs: [], name: "TransferFailed", type: "error" },
-  { inputs: [], name: "FeeTooHigh", type: "error" },
-  { inputs: [], name: "CategoryExists", type: "error" },
-  { inputs: [], name: "CannotBidOnOwnNFT", type: "error" },
-  { inputs: [], name: "CannotBuyOwnNFT", type: "error" },
+  { inputs: [], name: "Failed", type: "error" },
+  { inputs: [], name: "HighFee", type: "error" },
+  { inputs: [], name: "CatExists", type: "error" },
+  { inputs: [], name: "SelfBid", type: "error" },
+  { inputs: [], name: "SelfBuy", type: "error" },
 ] as const;
 
-// NFT Categories for PM Token ecosystem
+// NFT Categories
 export const NFT_CATEGORIES = [
   "PM Digital Card",
   "PM Voucher Card", 
