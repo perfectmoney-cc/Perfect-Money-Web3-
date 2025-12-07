@@ -1,4 +1,4 @@
-import { useReadContract, useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useReadContract, useAccount, useWriteContract } from 'wagmi';
 import { PMNFTABI } from '@/contracts/nftABI';
 import { PMTokenABI } from '@/contracts/abis';
 import { getContractAddress, PM_TOKEN_ADDRESS } from '@/contracts/addresses';
@@ -7,26 +7,26 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 const PMTOKEN_ADDRESS = PM_TOKEN_ADDRESS as `0x${string}`;
-
 const PMNFT_ADDRESS = getContractAddress(56, 'PMNFT') as `0x${string}`;
 
+// Updated interfaces to match optimized contract
 export interface NFTMetadata {
   name: string;
-  description: string;
+  desc: string;
   category: string;
-  royaltyPercent: bigint;
+  royalty: bigint;
   creator: `0x${string}`;
-  mintedAt: bigint;
+  time: bigint;
 }
 
 export interface NFTListing {
   seller: `0x${string}`;
   price: bigint;
-  isAuction: boolean;
-  auctionEndTime: bigint;
-  highestBidder: `0x${string}`;
-  highestBid: bigint;
-  isActive: boolean;
+  auction: boolean;
+  endTime: bigint;
+  bidder: `0x${string}`;
+  bid: bigint;
+  active: boolean;
 }
 
 export function useNFTStats() {
@@ -42,24 +42,24 @@ export function useNFTStats() {
     functionName: 'totalSupply',
   });
 
-  const { data: mintingFee, isLoading: mintingFeeLoading } = useReadContract({
+  const { data: mintFee, isLoading: mintFeeLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'mintingFee',
+    functionName: 'mintFee',
   });
 
-  const { data: platformFeePercent, isLoading: platformFeeLoading } = useReadContract({
+  const { data: platformFee, isLoading: platformFeeLoading } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'platformFeePercent',
+    functionName: 'platformFee',
   });
 
   return {
     totalMinted: totalMinted ? Number(totalMinted) : 0,
     totalSupply: totalSupply ? Number(totalSupply) : 0,
-    mintingFee: mintingFee ? formatEther(mintingFee as bigint) : '10000',
-    platformFeePercent: platformFeePercent ? Number(platformFeePercent) : 2,
-    isLoading: totalMintedLoading || totalSupplyLoading || mintingFeeLoading || platformFeeLoading,
+    mintingFee: mintFee ? formatEther(mintFee as bigint) : '10000',
+    platformFeePercent: platformFee ? Number(platformFee) : 2,
+    isLoading: totalMintedLoading || totalSupplyLoading || mintFeeLoading || platformFeeLoading,
   };
 }
 
@@ -103,9 +103,6 @@ export function useUserNFTs(address: `0x${string}` | undefined) {
 
   useEffect(() => {
     if (balance && address) {
-      const count = Number(balance);
-      // For now, we track via events/localStorage hybrid approach
-      // Full on-chain tracking would require iterating tokenOfOwnerByIndex
       setOwnedTokenIds([]);
     }
   }, [balance, address]);
@@ -182,10 +179,10 @@ export function useNFTMarketplace() {
   const { writeContractAsync } = useWriteContract();
   const { approvePMToken, checkAllowance, refetchAllowance } = useTokenApproval();
 
-  const { data: mintingFee } = useReadContract({
+  const { data: mintFee } = useReadContract({
     address: PMNFT_ADDRESS,
     abi: PMNFTABI,
-    functionName: 'mintingFee',
+    functionName: 'mintFee',
   });
 
   const mintNFT = async (
@@ -201,9 +198,8 @@ export function useNFTMarketplace() {
     }
     
     try {
-      const fee = mintingFee as bigint || parseEther('10000');
+      const fee = mintFee as bigint || parseEther('10000');
       
-      // Check if approval is needed
       if (!checkAllowance(fee)) {
         toast.info('Step 1/2: Approving PM tokens for minting fee...');
         await approvePMToken(fee);
@@ -232,7 +228,6 @@ export function useNFTMarketplace() {
     }
     
     try {
-      // Always approve first to ensure sufficient allowance
       if (!checkAllowance(price)) {
         toast.info('Step 1/2: Approving PM tokens for purchase...');
         await approvePMToken(price);
@@ -263,7 +258,6 @@ export function useNFTMarketplace() {
     try {
       const price = parseEther(priceInPM);
       
-      // First approve the tokens
       toast.info('Step 1/2: Approving PM tokens for purchase...');
       await writeContractAsync({
         address: PMTOKEN_ADDRESS,
@@ -272,7 +266,6 @@ export function useNFTMarketplace() {
         args: [PMNFT_ADDRESS, price],
       } as any);
 
-      // Then buy the NFT
       toast.info('Step 2/2: Completing purchase...');
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
@@ -297,7 +290,6 @@ export function useNFTMarketplace() {
     try {
       const amount = parseEther(bidAmount);
       
-      // First approve the tokens for the bid
       toast.info('Step 1/2: Approving PM tokens for bid...');
       await writeContractAsync({
         address: PMTOKEN_ADDRESS,
@@ -306,7 +298,6 @@ export function useNFTMarketplace() {
         args: [PMNFT_ADDRESS, amount],
       } as any);
 
-      // Then place the bid
       toast.info('Step 2/2: Placing bid...');
       const hash = await writeContractAsync({
         address: PMNFT_ADDRESS,
@@ -437,6 +428,6 @@ export function useNFTMarketplace() {
     placeBid,
     delistNFT,
     endAuction,
-    mintingFee: mintingFee as bigint | undefined,
+    mintingFee: mintFee as bigint | undefined,
   };
 }

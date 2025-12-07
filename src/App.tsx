@@ -49,6 +49,7 @@ import TokenClaimPage from "./pages/dashboard/TokenClaim";
 import MintNFTPage from "./pages/dashboard/MintNFT";
 import MarketplaceMinters from "./pages/dashboard/MarketplaceMinters";
 import MarketplaceStats from "./pages/dashboard/MarketplaceStats";
+import NFTAdmin from "./pages/dashboard/NFTAdmin";
 import PresaleTerms from "./pages/PresaleTerms";
 import LegalCompliance from "./pages/LegalCompliance";
 import BrandAssets from "./pages/BrandAssets";
@@ -103,6 +104,7 @@ const App = () => (
               <Route path="/dashboard/mint-nft" element={<MintNFTPage />} />
               <Route path="/dashboard/marketplace/minters" element={<MarketplaceMinters />} />
               <Route path="/dashboard/marketplace/stats" element={<MarketplaceStats />} />
+              <Route path="/dashboard/marketplace/admin" element={<NFTAdmin />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/tokenomics" element={<Tokenomics />} />
               <Route path="/whitepaper" element={<Whitepaper />} />
