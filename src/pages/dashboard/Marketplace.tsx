@@ -55,6 +55,7 @@ const MarketplacePage = () => {
   const [creatorFilter, setCreatorFilter] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [auctionTimeFilter, setAuctionTimeFilter] = useState<string>("all");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const { favorites, toggleFavorite, isFavorite, favoritesCount } = useNFTFavorites();
   const itemsPerPage = 12;
@@ -112,7 +113,7 @@ const MarketplacePage = () => {
     toast.success(added ? `${item.name} added to favorites` : `${item.name} removed from favorites`);
   };
 
-  // Filtering with creator and price range
+  // Filtering with creator, price range, and auction time
   const filteredItems = useMemo(() => {
     return marketItems.filter((item) => {
       const matchesSearch = searchQuery.trim() === "" ||
@@ -124,9 +125,29 @@ const MarketplacePage = () => {
       const minPriceNum = minPrice ? parseFloat(minPrice) : 0;
       const maxPriceNum = maxPrice ? parseFloat(maxPrice) : Infinity;
       const matchesPrice = item.price >= minPriceNum && item.price <= maxPriceNum;
-      return matchesSearch && matchesCategory && matchesCreator && matchesPrice;
+      
+      // Auction time remaining filter
+      let matchesAuctionTime = true;
+      if (auctionTimeFilter !== "all" && item.isAuction && item.auctionEndTime) {
+        const endTime = new Date(item.auctionEndTime).getTime();
+        const now = Date.now();
+        const hoursRemaining = (endTime - now) / (1000 * 60 * 60);
+        
+        switch (auctionTimeFilter) {
+          case "1h": matchesAuctionTime = hoursRemaining > 0 && hoursRemaining <= 1; break;
+          case "6h": matchesAuctionTime = hoursRemaining > 0 && hoursRemaining <= 6; break;
+          case "24h": matchesAuctionTime = hoursRemaining > 0 && hoursRemaining <= 24; break;
+          case "ending": matchesAuctionTime = hoursRemaining > 0 && hoursRemaining <= 3; break;
+          case "active": matchesAuctionTime = hoursRemaining > 0; break;
+          default: matchesAuctionTime = true;
+        }
+      } else if (auctionTimeFilter !== "all" && !item.isAuction) {
+        matchesAuctionTime = false;
+      }
+      
+      return matchesSearch && matchesCategory && matchesCreator && matchesPrice && matchesAuctionTime;
     });
-  }, [marketItems, searchQuery, selectedCategory, creatorFilter, minPrice, maxPrice]);
+  }, [marketItems, searchQuery, selectedCategory, creatorFilter, minPrice, maxPrice, auctionTimeFilter]);
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
@@ -348,11 +369,11 @@ const MarketplacePage = () => {
                   <Filter className="h-4 w-4 mr-2" />
                   Advanced Filters
                 </Button>
-                {(creatorFilter || minPrice || maxPrice) && (
+                {(creatorFilter || minPrice || maxPrice || auctionTimeFilter !== "all") && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => { setCreatorFilter(""); setMinPrice(""); setMaxPrice(""); setCurrentPage(1); }}
+                    onClick={() => { setCreatorFilter(""); setMinPrice(""); setMaxPrice(""); setAuctionTimeFilter("all"); setCurrentPage(1); }}
                   >
                     <X className="h-4 w-4 mr-1" />
                     Clear Filters
@@ -363,7 +384,7 @@ const MarketplacePage = () => {
               {/* Advanced Filters Panel */}
               {showAdvancedFilters && (
                 <Card className="p-4 bg-muted/30 border-dashed">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-muted-foreground">Creator Address</label>
                       <Input
@@ -392,6 +413,25 @@ const MarketplacePage = () => {
                         onChange={(e) => { setMaxPrice(e.target.value); setCurrentPage(1); }}
                         min="0"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                        <Timer className="h-3 w-3" />
+                        Auction Time
+                      </label>
+                      <Select value={auctionTimeFilter} onValueChange={(v) => { setAuctionTimeFilter(v); setCurrentPage(1); }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Items</SelectItem>
+                          <SelectItem value="active">Active Auctions</SelectItem>
+                          <SelectItem value="ending">Ending Soon (≤3h)</SelectItem>
+                          <SelectItem value="1h">Ending in 1 hour</SelectItem>
+                          <SelectItem value="6h">Ending in 6 hours</SelectItem>
+                          <SelectItem value="24h">Ending in 24 hours</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </Card>
