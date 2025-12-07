@@ -3,328 +3,161 @@ pragma solidity ^0.8.30;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IERC20 {
-    function transferFrom(address, address, uint256) external returns (bool);
-    function transfer(address, uint256) external returns (bool);
-    function balanceOf(address) external view returns (uint256);
-    function allowance(address, address) external view returns (uint256);
+    function transferFrom(address,address,uint256) external returns(bool);
+    function transfer(address,uint256) external returns(bool);
+    function balanceOf(address) external view returns(uint256);
+    function allowance(address,address) external view returns(uint256);
 }
 
-/**
- * @title PMNFT - Optimized NFT Marketplace
- * @dev ERC721 with marketplace, auctions, royalties. Optimized for contract size.
- */
-contract PMNFT is ERC721, ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGuard, Pausable {
+/// @title PMNFT - Optimized NFT Marketplace
+/// @dev Minimal ERC721 with marketplace, auctions, royalties
+contract PMNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
+    IERC20 public immutable pm;
+    uint256 private _tid;
+    uint256 public mFee;
+    uint256 public pFee;
+    address public col;
+    bool public paused;
     
-    IERC20 public immutable pmToken;
-    string[] public categories;
-    mapping(string => bool) public validCategory;
+    string[] public cats;
+    mapping(string=>bool) public vCat;
+    mapping(uint256=>L) public ls;
+    mapping(uint256=>M) public ms;
+    mapping(address=>uint256) public mCnt;
+    uint256 public tMint;
+    uint256 public tList;
+    uint256 public tSale;
+    uint256 public tVol;
+
+    struct L{address s;uint256 p;bool a;uint256 e;address b;uint256 h;bool x;}
+    struct M{string n;string d;string c;uint256 r;address cr;uint256 t;}
+
+    event Mint(uint256 indexed i,address indexed c,string n,string ct,uint256 r);
+    event List(uint256 indexed i,address indexed s,uint256 p,bool a,uint256 e);
+    event Delist(uint256 indexed i,address indexed s);
+    event Sale(uint256 indexed i,address indexed s,address indexed b,uint256 p);
+    event Bid(uint256 indexed i,address indexed b,uint256 a);
+    event AEnd(uint256 indexed i,address indexed w,uint256 a);
+
+    error Z();error LB();error LA();error NO();error NL();error LD();error BP();error BR();error BC();error BD();error NE();error ED();error LBd();error NA();error IA();error F();error HF();error CE();error SB();error P();
+
+    constructor(address _p)ERC721("Perfect Money NFT","PMNFT")Ownable(msg.sender){
+        if(_p==address(0))revert Z();
+        pm=IERC20(_p);col=msg.sender;mFee=10000e18;pFee=2;
+        _ac("PM Digital Card");_ac("PM Voucher Card");_ac("PM Gift Cards");
+        _ac("PM Partner Badge");_ac("PM Discount Card");_ac("PM VIP Exclusive Card");
+    }
+
+    modifier wP(){if(paused)revert P();_;}
+    modifier oO(uint256 i){if(ownerOf(i)!=msg.sender)revert NO();_;}
+    modifier iA(uint256 i){if(!ls[i].x)revert NL();_;}
+
+    function _ac(string memory c)internal{cats.push(c);vCat[c]=true;}
     
-    uint256 private _tokenId;
-    uint256 public mintFee;
-    uint256 public platformFee;
-    address public collector;
-    
-    uint256 public constant MAX_ROYALTY = 10;
-    uint256 public constant MAX_FEE = 10;
-    uint256 public constant MIN_AUCTION = 1 hours;
-    uint256 public constant MAX_AUCTION = 7 days;
-
-    struct Listing {
-        address seller;
-        uint256 price;
-        bool auction;
-        uint256 endTime;
-        address bidder;
-        uint256 bid;
-        bool active;
+    function _pt(address f,address t,uint256 a)internal{
+        if(a==0)return;
+        bool ok=f==address(this)?pm.transfer(t,a):pm.transferFrom(f,t,a);
+        if(!ok)revert F();
     }
 
-    struct Meta {
-        string name;
-        string desc;
-        string category;
-        uint256 royalty;
-        address creator;
-        uint256 time;
-    }
-    
-    struct Stats {
-        uint256 minted;
-        uint256 listings;
-        uint256 sales;
-        uint256 volume;
+    function mint(string calldata u,string calldata n,string calldata d,string calldata c,uint256 r)external nonReentrant wP returns(uint256){
+        if(r>10)revert BR();if(!vCat[c])revert BC();
+        if(pm.balanceOf(msg.sender)<mFee)revert LB();
+        if(pm.allowance(msg.sender,address(this))<mFee)revert LA();
+        uint256 i=_tid++;
+        ms[i]=M(n,d,c,r,msg.sender,block.timestamp);
+        mCnt[msg.sender]++;tMint++;
+        _pt(msg.sender,col,mFee);
+        _safeMint(msg.sender,i);_setTokenURI(i,u);
+        emit Mint(i,msg.sender,n,c,r);
+        return i;
     }
 
-    mapping(uint256 => Listing) public listings;
-    mapping(uint256 => Meta) public meta;
-    mapping(address => uint256) public minted;
-    Stats public stats;
-
-    event Mint(uint256 indexed id, address indexed creator, string name, string cat, uint256 royalty);
-    event List(uint256 indexed id, address indexed seller, uint256 price, bool auction, uint256 end);
-    event Delist(uint256 indexed id, address indexed seller);
-    event Sale(uint256 indexed id, address indexed seller, address indexed buyer, uint256 price, uint256 fee, uint256 royalty);
-    event Bid(uint256 indexed id, address indexed bidder, uint256 amt, address prev);
-    event AuctionEnd(uint256 indexed id, address indexed winner, uint256 amt);
-    event Refund(uint256 indexed id, address indexed bidder, uint256 amt);
-    event FeeUpdate(uint256 old, uint256 next);
-    event PlatformFeeUpdate(uint256 old, uint256 next);
-    event CollectorUpdate(address old, address next);
-    event CategoryAdd(string cat);
-    event Withdraw(address indexed to, uint256 amt);
-
-    error Zero();
-    error LowBal(uint256 need, uint256 have);
-    error LowAllow(uint256 need, uint256 have);
-    error NotOwner();
-    error NotListed();
-    error Listed();
-    error BadPrice();
-    error BadRoyalty();
-    error BadCategory();
-    error BadDuration();
-    error NotEnded();
-    error Ended();
-    error LowBid(uint256 min, uint256 got);
-    error NotAuction();
-    error IsAuction();
-    error Failed();
-    error HighFee();
-    error CatExists();
-    error SelfBid();
-    error SelfBuy();
-
-    constructor(address _pm) ERC721("Perfect Money NFT", "PMNFT") Ownable(msg.sender) {
-        if (_pm == address(0)) revert Zero();
-        pmToken = IERC20(_pm);
-        collector = msg.sender;
-        mintFee = 10000 * 10**18;
-        platformFee = 2;
-        _addCat("PM Digital Card");
-        _addCat("PM Voucher Card");
-        _addCat("PM Gift Cards");
-        _addCat("PM Partner Badge");
-        _addCat("PM Discount Card");
-        _addCat("PM VIP Exclusive Card");
+    function listSale(uint256 i,uint256 p)external nonReentrant wP oO(i){
+        if(ls[i].x)revert LD();if(p==0)revert BP();
+        ls[i]=L(msg.sender,p,false,0,address(0),0,true);tList++;
+        _approve(address(this),i,msg.sender);
+        emit List(i,msg.sender,p,false,0);
     }
 
-    modifier isOwner(uint256 id) {
-        if (ownerOf(id) != msg.sender) revert NotOwner();
-        _;
-    }
-    
-    modifier isActive(uint256 id) {
-        if (!listings[id].active) revert NotListed();
-        _;
-    }
-
-    function _addCat(string memory c) internal {
-        categories.push(c);
-        validCategory[c] = true;
-        emit CategoryAdd(c);
-    }
-    
-    function _pmTransfer(address f, address t, uint256 a) internal {
-        if (a == 0) return;
-        bool ok = f == address(this) ? pmToken.transfer(t, a) : pmToken.transferFrom(f, t, a);
-        if (!ok) revert Failed();
-    }
-    
-    function _pay(uint256 id, uint256 p, address buyer, address seller, bool fromContract) internal returns (uint256 pFee, uint256 r) {
-        Meta memory m = meta[id];
-        pFee = (p * platformFee) / 100;
-        if (m.creator != seller && m.royalty > 0) r = (p * m.royalty) / 100;
-        uint256 sellerAmt = p - pFee - r;
-        address src = fromContract ? address(this) : buyer;
-        _pmTransfer(src, collector, pFee);
-        if (r > 0) _pmTransfer(src, m.creator, r);
-        _pmTransfer(src, seller, sellerAmt);
-        stats.sales++;
-        stats.volume += p;
+    function listAuct(uint256 i,uint256 p,uint256 dur)external nonReentrant wP oO(i){
+        if(ls[i].x)revert LD();if(p==0)revert BP();
+        if(dur<1 hours||dur>7 days)revert BD();
+        uint256 e=block.timestamp+dur;
+        ls[i]=L(msg.sender,p,true,e,address(0),0,true);tList++;
+        _approve(address(this),i,msg.sender);
+        emit List(i,msg.sender,p,true,e);
     }
 
-    function addCategory(string calldata c) external onlyOwner {
-        if (validCategory[c]) revert CatExists();
-        _addCat(c);
-    }
-    
-    function getCategories() external view returns (string[] memory) {
-        return categories;
-    }
-
-    function mint(string calldata uri, string calldata name, string calldata desc, string calldata cat, uint256 royalty) external nonReentrant whenNotPaused returns (uint256) {
-        if (royalty > MAX_ROYALTY) revert BadRoyalty();
-        if (!validCategory[cat]) revert BadCategory();
-        uint256 bal = pmToken.balanceOf(msg.sender);
-        if (bal < mintFee) revert LowBal(mintFee, bal);
-        uint256 allow = pmToken.allowance(msg.sender, address(this));
-        if (allow < mintFee) revert LowAllow(mintFee, allow);
-
-        uint256 id = _tokenId++;
-        meta[id] = Meta(name, desc, cat, royalty, msg.sender, block.timestamp);
-        minted[msg.sender]++;
-        stats.minted++;
-
-        _pmTransfer(msg.sender, collector, mintFee);
-        _safeMint(msg.sender, id);
-        _setTokenURI(id, uri);
-
-        emit Mint(id, msg.sender, name, cat, royalty);
-        return id;
+    function delist(uint256 i)external nonReentrant iA(i){
+        L storage l=ls[i];if(l.s!=msg.sender)revert NO();
+        address rb=l.b;uint256 ra=l.h;
+        delete ls[i];
+        if(rb!=address(0)&&ra>0)_pt(address(this),rb,ra);
+        emit Delist(i,msg.sender);
     }
 
-    function listForSale(uint256 id, uint256 price) external nonReentrant whenNotPaused isOwner(id) {
-        if (listings[id].active) revert Listed();
-        if (price == 0) revert BadPrice();
-        listings[id] = Listing(msg.sender, price, false, 0, address(0), 0, true);
-        stats.listings++;
-        _approve(address(this), id, msg.sender);
-        emit List(id, msg.sender, price, false, 0);
+    function buy(uint256 i)external nonReentrant wP iA(i){
+        L storage l=ls[i];if(l.a)revert IA();if(l.s==msg.sender)revert SB();
+        uint256 p=l.p;address s=l.s;
+        if(pm.balanceOf(msg.sender)<p)revert LB();
+        if(pm.allowance(msg.sender,address(this))<p)revert LA();
+        delete ls[i];
+        _pay(i,p,msg.sender,s,false);
+        _transfer(s,msg.sender,i);
+        emit Sale(i,s,msg.sender,p);
     }
 
-    function listForAuction(uint256 id, uint256 startPrice, uint256 dur) external nonReentrant whenNotPaused isOwner(id) {
-        if (listings[id].active) revert Listed();
-        if (startPrice == 0) revert BadPrice();
-        if (dur < MIN_AUCTION || dur > MAX_AUCTION) revert BadDuration();
-        uint256 end = block.timestamp + dur;
-        listings[id] = Listing(msg.sender, startPrice, true, end, address(0), 0, true);
-        stats.listings++;
-        _approve(address(this), id, msg.sender);
-        emit List(id, msg.sender, startPrice, true, end);
+    function bid(uint256 i,uint256 a)external nonReentrant wP iA(i){
+        L storage l=ls[i];if(!l.a)revert NA();
+        if(block.timestamp>=l.e)revert ED();if(l.s==msg.sender)revert SB();
+        uint256 mn=l.h>0?l.h+1:l.p;if(a<mn)revert LBd();
+        if(pm.balanceOf(msg.sender)<a)revert LB();
+        if(pm.allowance(msg.sender,address(this))<a)revert LA();
+        address pb=l.b;uint256 pa=l.h;
+        l.b=msg.sender;l.h=a;
+        _pt(msg.sender,address(this),a);
+        if(pb!=address(0)&&pa>0)_pt(address(this),pb,pa);
+        emit Bid(i,msg.sender,a);
     }
 
-    function delist(uint256 id) external nonReentrant isActive(id) {
-        Listing storage l = listings[id];
-        if (l.seller != msg.sender) revert NotOwner();
-        address refundTo = l.bidder;
-        uint256 refundAmt = l.bid;
-        delete listings[id];
-        if (refundTo != address(0) && refundAmt > 0) {
-            _pmTransfer(address(this), refundTo, refundAmt);
-            emit Refund(id, refundTo, refundAmt);
-        }
-        emit Delist(id, msg.sender);
+    function endAuct(uint256 i)external nonReentrant iA(i){
+        L storage l=ls[i];if(!l.a)revert NA();if(block.timestamp<l.e)revert NE();
+        address s=l.s;address w=l.b;uint256 wb=l.h;
+        delete ls[i];
+        if(w==address(0)){emit AEnd(i,address(0),0);return;}
+        _pay(i,wb,w,s,true);_transfer(s,w,i);
+        emit AEnd(i,w,wb);emit Sale(i,s,w,wb);
     }
 
-    function buy(uint256 id) external nonReentrant whenNotPaused isActive(id) {
-        Listing storage l = listings[id];
-        if (l.auction) revert IsAuction();
-        if (l.seller == msg.sender) revert SelfBuy();
-        uint256 p = l.price;
-        address seller = l.seller;
-        uint256 bal = pmToken.balanceOf(msg.sender);
-        if (bal < p) revert LowBal(p, bal);
-        uint256 allow = pmToken.allowance(msg.sender, address(this));
-        if (allow < p) revert LowAllow(p, allow);
-        delete listings[id];
-        (uint256 pFee, uint256 r) = _pay(id, p, msg.sender, seller, false);
-        _transfer(seller, msg.sender, id);
-        emit Sale(id, seller, msg.sender, p, pFee, r);
+    function _pay(uint256 i,uint256 p,address by,address sl,bool fc)internal{
+        M memory m=ms[i];
+        uint256 pf=(p*pFee)/100;
+        uint256 r=(m.cr!=sl&&m.r>0)?(p*m.r)/100:0;
+        uint256 sa=p-pf-r;
+        address src=fc?address(this):by;
+        _pt(src,col,pf);if(r>0)_pt(src,m.cr,r);_pt(src,sl,sa);
+        tSale++;tVol+=p;
     }
 
-    function placeBid(uint256 id, uint256 amt) external nonReentrant whenNotPaused isActive(id) {
-        Listing storage l = listings[id];
-        if (!l.auction) revert NotAuction();
-        if (block.timestamp >= l.endTime) revert Ended();
-        if (l.seller == msg.sender) revert SelfBid();
-        uint256 minBid = l.bid > 0 ? l.bid + 1 : l.price;
-        if (amt < minBid) revert LowBid(minBid, amt);
-        uint256 bal = pmToken.balanceOf(msg.sender);
-        if (bal < amt) revert LowBal(amt, bal);
-        uint256 allow = pmToken.allowance(msg.sender, address(this));
-        if (allow < amt) revert LowAllow(amt, allow);
-        address prev = l.bidder;
-        uint256 prevAmt = l.bid;
-        l.bidder = msg.sender;
-        l.bid = amt;
-        _pmTransfer(msg.sender, address(this), amt);
-        if (prev != address(0) && prevAmt > 0) {
-            _pmTransfer(address(this), prev, prevAmt);
-            emit Refund(id, prev, prevAmt);
-        }
-        emit Bid(id, msg.sender, amt, prev);
-    }
+    function getLs(uint256 i)external view returns(L memory){return ls[i];}
+    function getMs(uint256 i)external view returns(M memory){return ms[i];}
+    function getCats()external view returns(string[] memory){return cats;}
+    function getSt()external view returns(uint256,uint256,uint256,uint256){return(tMint,tList,tSale,tVol);}
+    function aEnd(uint256 i)external view returns(bool){L memory l=ls[i];return l.x&&l.a&&block.timestamp>=l.e;}
+    function tLeft(uint256 i)external view returns(uint256){L memory l=ls[i];return(!l.x||!l.a||block.timestamp>=l.e)?0:l.e-block.timestamp;}
 
-    function endAuction(uint256 id) external nonReentrant isActive(id) {
-        Listing storage l = listings[id];
-        if (!l.auction) revert NotAuction();
-        if (block.timestamp < l.endTime) revert NotEnded();
-        address seller = l.seller;
-        address winner = l.bidder;
-        uint256 winBid = l.bid;
-        delete listings[id];
-        if (winner == address(0)) {
-            emit AuctionEnd(id, address(0), 0);
-            return;
-        }
-        (uint256 pFee, uint256 r) = _pay(id, winBid, winner, seller, true);
-        _transfer(seller, winner, id);
-        emit AuctionEnd(id, winner, winBid);
-        emit Sale(id, seller, winner, winBid, pFee, r);
-    }
+    function setMFee(uint256 f)external onlyOwner{mFee=f;}
+    function setPFee(uint256 p)external onlyOwner{if(p>10)revert HF();pFee=p;}
+    function setCol(address c)external onlyOwner{if(c==address(0))revert Z();col=c;}
+    function addCat(string calldata c)external onlyOwner{if(vCat[c])revert CE();_ac(c);}
+    function wd(uint256 a)external onlyOwner{_pt(address(this),msg.sender,a);}
+    function setPause(bool p)external onlyOwner{paused=p;}
 
-    function getListing(uint256 id) external view returns (Listing memory) { return listings[id]; }
-    function getMetadata(uint256 id) external view returns (Meta memory) { return meta[id]; }
-    function getTotalMinted() external view returns (uint256) { return _tokenId; }
-    function getStats() external view returns (Stats memory) { return stats; }
-    function getMinted(address a) external view returns (uint256) { return minted[a]; }
-    function auctionEnded(uint256 id) external view returns (bool) {
-        Listing memory l = listings[id];
-        return l.active && l.auction && block.timestamp >= l.endTime;
-    }
-    function timeLeft(uint256 id) external view returns (uint256) {
-        Listing memory l = listings[id];
-        if (!l.active || !l.auction || block.timestamp >= l.endTime) return 0;
-        return l.endTime - block.timestamp;
-    }
-
-    function setMintFee(uint256 f) external onlyOwner {
-        uint256 old = mintFee;
-        mintFee = f;
-        emit FeeUpdate(old, f);
-    }
-    
-    function setPlatformFee(uint256 p) external onlyOwner {
-        if (p > MAX_FEE) revert HighFee();
-        uint256 old = platformFee;
-        platformFee = p;
-        emit PlatformFeeUpdate(old, p);
-    }
-    
-    function setCollector(address c) external onlyOwner {
-        if (c == address(0)) revert Zero();
-        address old = collector;
-        collector = c;
-        emit CollectorUpdate(old, c);
-    }
-    
-    function withdraw(uint256 a) external onlyOwner {
-        _pmTransfer(address(this), msg.sender, a);
-        emit Withdraw(msg.sender, a);
-    }
-    
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
-
-    function _update(address to, uint256 id, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
-        return super._update(to, id, auth);
-    }
-    
-    function _increaseBalance(address a, uint128 v) internal override(ERC721, ERC721Enumerable) {
-        super._increaseBalance(a, v);
-    }
-    
-    function tokenURI(uint256 id) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        return super.tokenURI(id);
-    }
-    
-    function supportsInterface(bytes4 iface) public view override(ERC721, ERC721Enumerable, ERC721URIStorage) returns (bool) {
-        return super.supportsInterface(iface);
-    }
+    function tokenURI(uint256 i)public view override(ERC721,ERC721URIStorage)returns(string memory){return super.tokenURI(i);}
+    function supportsInterface(bytes4 f)public view override(ERC721,ERC721URIStorage)returns(bool){return super.supportsInterface(f);}
 }
