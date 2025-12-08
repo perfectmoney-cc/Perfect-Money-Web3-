@@ -2,28 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-  Copy,
-  ShoppingCart,
-  Grid3X3,
-  X,
-  Send,
-  ArrowDownToLine,
-  ArrowDownUp,
-  TrendingUp,
-  Store,
-  Gift,
-  Users,
-  Handshake,
-  Shield,
-  MessageCircle,
-  Link2,
-  Settings,
-  Lock,
-  SendHorizonal,
-  Sparkles,
-  Ticket,
-} from "lucide-react";
+import { Copy, ShoppingCart, Grid3X3, X, Send, ArrowDownToLine, ArrowDownUp, TrendingUp, Store, Gift, Users, Handshake, Shield, MessageCircle, Link2, Settings, Lock, SendHorizonal, Sparkles, Ticket } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import pmTokenLogo from "@/assets/pm-token-logo.png";
@@ -35,25 +14,33 @@ interface WalletCardProps {
   showQuickFunctionsToggle?: boolean;
   compact?: boolean;
 }
-export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }: WalletCardProps) => {
+export const WalletCard = ({
+  showQuickFunctionsToggle = true,
+  compact = false
+}: WalletCardProps) => {
   const navigate = useNavigate();
-  const { address, isConnected } = useAccount();
+  const {
+    address,
+    isConnected
+  } = useAccount();
 
   // Use wagmi for PM token balance - will fetch from blockchain when connected
   const {
     data: tokenBalance,
     isLoading: isBalanceLoading,
-    refetch: refetchBalance,
+    refetch: refetchBalance
   } = useBalance({
     address: address,
     token: PM_TOKEN_ADDRESS as `0x${string}`,
-    chainId: 56, // BSC Mainnet
+    chainId: 56 // BSC Mainnet
   });
 
   // Also get native BNB balance for reference
-  const { data: bnbBalance } = useBalance({
+  const {
+    data: bnbBalance
+  } = useBalance({
     address: address,
-    chainId: 56,
+    chainId: 56
   });
   const [balance, setBalance] = useState(() => {
     const savedBalance = localStorage.getItem("pmBalance");
@@ -99,8 +86,8 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
           margin: 1,
           color: {
             dark: "#000000",
-            light: "#FFFFFF",
-          },
+            light: "#FFFFFF"
+          }
         });
         setQrCodeUrl(url);
       } catch (error) {
@@ -132,7 +119,6 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
       toast.error("No Web3 wallet detected. Please install MetaMask or another Web3 wallet.");
       return;
     }
-
     if (!isConnected) {
       toast.error("Please connect your wallet first");
       return;
@@ -144,11 +130,9 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
       toast.error("Invalid token contract address");
       return;
     }
-
     try {
       // Use the new PM token icon in public folder
       const tokenImageUrl = `${window.location.origin}/pm-token-icon.png`;
-      
       const wasAdded = await ethereum.request({
         method: "wallet_watchAsset",
         params: {
@@ -157,11 +141,10 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
             address: tokenAddress,
             symbol: "PM",
             decimals: 18,
-            image: tokenImageUrl,
-          },
-        },
+            image: tokenImageUrl
+          }
+        }
       });
-
       if (wasAdded) {
         toast.success("PM Token added to your wallet!");
       } else {
@@ -176,144 +159,116 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
       }
     }
   };
-  const quickFunctions = [
-    {
-      to: "/dashboard/send",
-      icon: Send,
-      label: "Send",
-      color: "text-primary",
-      bg: "bg-primary/10",
-    },
-    {
-      to: "/dashboard/receive",
-      icon: ArrowDownToLine,
-      label: "Receive",
-      color: "text-secondary",
-      bg: "bg-secondary/10",
-    },
-    {
-      to: "/dashboard/swap",
-      icon: ArrowDownUp,
-      label: "Swap",
-      color: "text-primary",
-      bg: "bg-primary/10",
-    },
-    {
-      to: "/dashboard/buy",
-      icon: ShoppingCart,
-      label: "Buy",
-      color: "text-green-500",
-      bg: "bg-green-500/10",
-    },
-    {
-      to: "/dashboard/stake",
-      icon: TrendingUp,
-      label: "Stake",
-      color: "text-primary",
-      bg: "bg-primary/10",
-    },
-    {
-      to: "/dashboard/merchant",
-      icon: Store,
-      label: "Merchant",
-      color: "text-orange-500",
-      bg: "bg-orange-500/10",
-    },
-    {
-      to: "/dashboard/voucher",
-      icon: Ticket,
-      label: "Voucher",
-      color: "text-teal-500",
-      bg: "bg-teal-500/10",
-    },
-    {
-      to: "/dashboard/referral",
-      icon: Users,
-      label: "Referral",
-      color: "text-blue-500",
-      bg: "bg-blue-500/10",
-    },
-    {
-      to: "/dashboard/airdrop",
-      icon: Gift,
-      label: "Airdrop",
-      color: "text-purple-500",
-      bg: "bg-purple-500/10",
-    },
-    {
-      to: "/dashboard/partners",
-      icon: Handshake,
-      label: "Partners",
-      color: "text-yellow-500",
-      bg: "bg-yellow-500/10",
-    },
-    {
-      to: "/dashboard/token-security",
-      icon: Shield,
-      label: "Security",
-      color: "text-red-500",
-      bg: "bg-red-500/10",
-    },
-    {
-      to: "/dashboard/community",
-      icon: MessageCircle,
-      label: "Community",
-      color: "text-cyan-500",
-      bg: "bg-cyan-500/10",
-    },
-    {
-      to: "/dashboard/marketplace",
-      icon: ShoppingCart,
-      label: "Marketplace",
-      color: "text-pink-500",
-      bg: "bg-pink-500/10",
-    },
-    {
-      to: "/dashboard/token-sender",
-      icon: SendHorizonal,
-      label: "Token Sender",
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
-    },
-    {
-      to: "/dashboard/token-locker",
-      icon: Lock,
-      label: "Token Locker",
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
-    },
-    {
-      to: "/dashboard/mint-nft",
-      icon: Sparkles,
-      label: "Mint NFT",
-      color: "text-fuchsia-500",
-      bg: "bg-fuchsia-500/10",
-    },
-  ];
-  return (
-    <div className="space-y-4">
+  const quickFunctions = [{
+    to: "/dashboard/send",
+    icon: Send,
+    label: "Send",
+    color: "text-primary",
+    bg: "bg-primary/10"
+  }, {
+    to: "/dashboard/receive",
+    icon: ArrowDownToLine,
+    label: "Receive",
+    color: "text-secondary",
+    bg: "bg-secondary/10"
+  }, {
+    to: "/dashboard/swap",
+    icon: ArrowDownUp,
+    label: "Swap",
+    color: "text-primary",
+    bg: "bg-primary/10"
+  }, {
+    to: "/dashboard/buy",
+    icon: ShoppingCart,
+    label: "Buy",
+    color: "text-green-500",
+    bg: "bg-green-500/10"
+  }, {
+    to: "/dashboard/stake",
+    icon: TrendingUp,
+    label: "Stake",
+    color: "text-primary",
+    bg: "bg-primary/10"
+  }, {
+    to: "/dashboard/merchant",
+    icon: Store,
+    label: "Merchant",
+    color: "text-orange-500",
+    bg: "bg-orange-500/10"
+  }, {
+    to: "/dashboard/voucher",
+    icon: Ticket,
+    label: "Voucher",
+    color: "text-teal-500",
+    bg: "bg-teal-500/10"
+  }, {
+    to: "/dashboard/referral",
+    icon: Users,
+    label: "Referral",
+    color: "text-blue-500",
+    bg: "bg-blue-500/10"
+  }, {
+    to: "/dashboard/airdrop",
+    icon: Gift,
+    label: "Airdrop",
+    color: "text-purple-500",
+    bg: "bg-purple-500/10"
+  }, {
+    to: "/dashboard/partners",
+    icon: Handshake,
+    label: "Partners",
+    color: "text-yellow-500",
+    bg: "bg-yellow-500/10"
+  }, {
+    to: "/dashboard/token-security",
+    icon: Shield,
+    label: "Security",
+    color: "text-red-500",
+    bg: "bg-red-500/10"
+  }, {
+    to: "/dashboard/community",
+    icon: MessageCircle,
+    label: "Community",
+    color: "text-cyan-500",
+    bg: "bg-cyan-500/10"
+  }, {
+    to: "/dashboard/marketplace",
+    icon: ShoppingCart,
+    label: "Marketplace",
+    color: "text-pink-500",
+    bg: "bg-pink-500/10"
+  }, {
+    to: "/dashboard/token-sender",
+    icon: SendHorizonal,
+    label: "Token Sender",
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10"
+  }, {
+    to: "/dashboard/token-locker",
+    icon: Lock,
+    label: "Token Locker",
+    color: "text-amber-500",
+    bg: "bg-amber-500/10"
+  }, {
+    to: "/dashboard/mint-nft",
+    icon: Sparkles,
+    label: "Mint NFT",
+    color: "text-fuchsia-500",
+    bg: "bg-fuchsia-500/10"
+  }];
+  return <div className="space-y-4">
       {/* Wallet Card Header */}
-      {showQuickFunctionsToggle && (
-        <div className="flex items-center justify-between mb-3">
+      {showQuickFunctionsToggle && <div className="flex items-center justify-between mb-3">
           <h2 className="text-primary font-semibold text-lg">Wallets</h2>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowPinSettings(true)}
-              className="p-2 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-all duration-300"
-              title="Security Settings"
-            >
+            <button onClick={() => setShowPinSettings(true)} className="p-2 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-all duration-300" title="Security Settings">
               <Settings className="h-4 w-4 text-primary" />
             </button>
-            <button
-              onClick={() => setShowQuickFunctions(!showQuickFunctions)}
-              className="p-2 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-all duration-300"
-              title="Quick Functions"
-            >
+            <button onClick={() => setShowQuickFunctions(!showQuickFunctions)} className="p-2 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-all duration-300" title="Quick Functions">
               <Grid3X3 className="h-4 w-4 text-primary" />
             </button>
           </div>
-        </div>
-      )}
+        </div>}
 
       {/* PIN Settings Modal */}
       <PinSettingsModal open={showPinSettings} onClose={() => setShowPinSettings(false)} />
@@ -329,20 +284,16 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
             {/* QR Code Section */}
             <div className="flex items-start gap-4">
               <div className="bg-white p-2 rounded-lg shadow-lg">
-                {qrCodeUrl ? (
-                  <img src={qrCodeUrl} alt="Wallet QR Code" className="w-20 h-20 md:w-24 md:h-24" />
-                ) : (
-                  <div className="w-20 h-20 md:w-24 md:h-24 flex items-center justify-center bg-gray-100 rounded">
+                {qrCodeUrl ? <img src={qrCodeUrl} alt="Wallet QR Code" className="w-20 h-20 md:w-24 md:h-24" /> : <div className="w-20 h-20 md:w-24 md:h-24 flex items-center justify-center bg-gray-100 rounded">
                     <span className="text-xs text-gray-400">Loading...</span>
-                  </div>
-                )}
+                  </div>}
               </div>
 
               {/* Token Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-3">
                   {/* PM Logo */}
-                  <img src="/pm-icon-512.png" alt="PM" className="w-10 h-10 rounded-full" />
+                  <img alt="PM" className="w-10 h-10 rounded-full" src="/lovable-uploads/62397bdd-bb52-4769-8622-3b3f8c73031f.png" />
                   <div className="flex flex-col">
                     <span className="text-white font-bold text-lg">Perfect Money</span>
                     <span className="text-white/80 text-[10px] font-medium">Just Made It Perfect</span>
@@ -365,14 +316,10 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
                 {/* Balance */}
                 <div>
                   <p className="text-white md:text-3xl font-bold text-base">
-                    {isBalanceLoading ? (
-                      <span className="animate-pulse">Loading...</span>
-                    ) : (
-                      `${parseFloat(balance).toLocaleString("en-US", {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })} PM`
-                    )}
+                    {isBalanceLoading ? <span className="animate-pulse">Loading...</span> : `${parseFloat(balance).toLocaleString("en-US", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                  })} PM`}
                   </p>
                   {isConnected && <p className="text-white/60 text-xs mt-1">Real-time • BSC Mainnet</p>}
                 </div>
@@ -391,21 +338,13 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
       </Card>
 
       {/* Action Buttons */}
-      {!compact && (
-        <>
+      {!compact && <>
           <div className="flex gap-3 mt-4">
-            <Button
-              onClick={() => navigate("/dashboard/buy")}
-              className="flex-1 bg-primary hover:bg-primary/90 text-white font-semibold gap-2"
-            >
+            <Button onClick={() => navigate("/dashboard/buy")} className="flex-1 bg-primary hover:bg-primary/90 text-white font-semibold gap-2">
               <ShoppingCart className="h-4 w-4" />
               Buy Token
             </Button>
-            <Button
-              variant="outline"
-              onClick={addTokenToWallet}
-              className="flex-1 border-primary/50 hover:bg-primary/10 text-foreground font-semibold gap-2"
-            >
+            <Button variant="outline" onClick={addTokenToWallet} className="flex-1 border-primary/50 hover:bg-primary/10 text-foreground font-semibold gap-2">
               <img src={pmTokenLogo} alt="PM" className="h-4 w-4" />
               Add Token
             </Button>
@@ -413,42 +352,29 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
 
           {/* Separator */}
           <Separator className="my-4 bg-border/50" />
-        </>
-      )}
+        </>}
 
       {/* Quick Functions Modal */}
-      {showQuickFunctions && (
-        <Card className="relative overflow-hidden bg-card border border-border shadow-xl animate-fade-in">
+      {showQuickFunctions && <Card className="relative overflow-hidden bg-card border border-border shadow-xl animate-fade-in">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Grid3X3 className="h-5 w-5 text-primary" />
                 <h3 className="font-semibold">Quick Functions</h3>
               </div>
-              <button
-                onClick={() => setShowQuickFunctions(false)}
-                className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-              >
+              <button onClick={() => setShowQuickFunctions(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-              {quickFunctions.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="flex flex-col items-center gap-2 p-3 md:p-4 rounded-xl bg-muted/50 hover:bg-primary/10 transition-all border border-transparent hover:border-primary/30"
-                >
+              {quickFunctions.map(item => <Link key={item.to} to={item.to} className="flex flex-col items-center gap-2 p-3 md:p-4 rounded-xl bg-muted/50 hover:bg-primary/10 transition-all border border-transparent hover:border-primary/30">
                   <div className={`p-2 md:p-3 rounded-full ${item.bg}`}>
                     <item.icon className={`h-4 w-4 md:h-5 md:w-5 ${item.color}`} />
                   </div>
                   <span className="text-[10px] md:text-xs font-medium">{item.label}</span>
-                </Link>
-              ))}
+                </Link>)}
             </div>
           </div>
-        </Card>
-      )}
-    </div>
-  );
+        </Card>}
+    </div>;
 };
