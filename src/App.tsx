@@ -54,6 +54,12 @@ import VoucherPage from "./pages/dashboard/Voucher";
 import VoucherAdminPage from "./pages/dashboard/VoucherAdmin";
 import VaultPage from "./pages/dashboard/Vault";
 import VaultAdminPage from "./pages/dashboard/VaultAdmin";
+import MerchantMultiCurrency from "./pages/dashboard/MerchantMultiCurrency";
+import MerchantLoyalty from "./pages/dashboard/MerchantLoyalty";
+import MerchantPOS from "./pages/dashboard/MerchantPOS";
+import MerchantRecurring from "./pages/dashboard/MerchantRecurring";
+import MerchantAnalytics from "./pages/dashboard/MerchantAnalytics";
+import MerchantPromotion from "./pages/dashboard/MerchantPromotion";
 import PresaleTerms from "./pages/PresaleTerms";
 import LegalCompliance from "./pages/LegalCompliance";
 import BrandAssets from "./pages/BrandAssets";
@@ -112,6 +118,12 @@ const App = () => (
               <Route path="/dashboard/voucher/admin" element={<VoucherAdminPage />} />
               <Route path="/dashboard/vault" element={<VaultPage />} />
               <Route path="/dashboard/vault/admin" element={<VaultAdminPage />} />
+              <Route path="/dashboard/merchant/multi-currency" element={<MerchantMultiCurrency />} />
+              <Route path="/dashboard/merchant/loyalty" element={<MerchantLoyalty />} />
+              <Route path="/dashboard/merchant/pos" element={<MerchantPOS />} />
+              <Route path="/dashboard/merchant/recurring" element={<MerchantRecurring />} />
+              <Route path="/dashboard/merchant/analytics" element={<MerchantAnalytics />} />
+              <Route path="/dashboard/merchant/promotions" element={<MerchantPromotion />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/tokenomics" element={<Tokenomics />} />
               <Route path="/whitepaper" element={<Whitepaper />} />
