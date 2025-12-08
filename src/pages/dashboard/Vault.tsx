@@ -14,13 +14,16 @@ import { WalletCard } from "@/components/WalletCard";
 import { 
   ArrowLeft, Vault as VaultIcon, Lock, TrendingUp, Clock, 
   Coins, Loader2, CheckCircle, AlertTriangle, DollarSign, Sparkles,
-  BarChart3, History, Target, Settings, PieChart
+  BarChart3, History, Target, Settings, PieChart, Users, Trophy, AlertCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { CONTRACT_ADDRESSES, PM_TOKEN_ADDRESS } from "@/contracts/addresses";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from "recharts";
+import { ReferralBonus } from "@/components/vault/ReferralBonus";
+import { EarlyWithdrawalModal } from "@/components/vault/EarlyWithdrawal";
+import { StakingLeaderboard } from "@/components/vault/StakingLeaderboard";
 import usdtLogo from "@/assets/usdt-logo.png";
 import usdcLogo from "@/assets/usdc-logo.png";
 
@@ -116,6 +119,8 @@ const Vault = () => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [stakeHistory, setStakeHistory] = useState<StakeHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState("stake");
+  const [showEarlyWithdrawal, setShowEarlyWithdrawal] = useState(false);
+  const [selectedStakeForWithdrawal, setSelectedStakeForWithdrawal] = useState<number | null>(null);
 
   // Get PM token balance
   const { data: pmTokenBalance } = useBalance({
@@ -342,6 +347,39 @@ const Vault = () => {
     ]);
   };
 
+  const handleEarlyWithdrawal = (stakeIndex: number) => {
+    setSelectedStakeForWithdrawal(stakeIndex);
+    setShowEarlyWithdrawal(true);
+  };
+
+  const confirmEarlyWithdrawal = () => {
+    if (selectedStakeForWithdrawal === null) return;
+    
+    const stake = userStakes[selectedStakeForWithdrawal];
+    const penalty = stake.amount * 0.20;
+    const netAmount = stake.amount - penalty;
+    
+    const updatedStakes = [...userStakes];
+    updatedStakes[selectedStakeForWithdrawal] = {
+      ...stake,
+      isActive: false,
+    };
+    setUserStakes(updatedStakes);
+    
+    setStakeHistory([
+      {
+        date: new Date().toLocaleString(),
+        action: "withdraw",
+        amount: netAmount,
+        token: stake.token,
+        plan: STAKING_PLANS.find(p => p.id === stake.planId)?.name || "",
+      },
+      ...stakeHistory,
+    ]);
+    
+    setSelectedStakeForWithdrawal(null);
+  };
+
   const getTierIcon = (tier: string) => {
     switch (tier) {
       case "bronze":
@@ -421,18 +459,26 @@ const Vault = () => {
 
           {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-3">
+            <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="stake" className="gap-2">
                 <VaultIcon className="h-4 w-4" />
-                Stake
+                <span className="hidden sm:inline">Stake</span>
+              </TabsTrigger>
+              <TabsTrigger value="referral" className="gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Referral</span>
+              </TabsTrigger>
+              <TabsTrigger value="leaderboard" className="gap-2">
+                <Trophy className="h-4 w-4" />
+                <span className="hidden sm:inline">Ranking</span>
               </TabsTrigger>
               <TabsTrigger value="analytics" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
-                Analytics
+                <span className="hidden sm:inline">Analytics</span>
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-2">
                 <History className="h-4 w-4" />
-                History
+                <span className="hidden sm:inline">History</span>
               </TabsTrigger>
             </TabsList>
 
@@ -689,7 +735,7 @@ const Vault = () => {
                             >
                               {pendingProfit < 10 ? `Min $10 to claim` : `Claim $${(pendingProfit * 0.95).toFixed(2)}`}
                             </Button>
-                            {isUnlocked && (
+                            {isUnlocked ? (
                               <Button 
                                 size="sm" 
                                 variant="outline" 
@@ -697,6 +743,16 @@ const Vault = () => {
                                 onClick={() => handleWithdrawCapital(userStakes.indexOf(stake))}
                               >
                                 Withdraw Capital
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                className="flex-1"
+                                onClick={() => handleEarlyWithdrawal(userStakes.indexOf(stake))}
+                              >
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Emergency Exit (20% fee)
                               </Button>
                             )}
                           </div>
@@ -706,6 +762,16 @@ const Vault = () => {
                   </div>
                 </Card>
               )}
+            </TabsContent>
+
+            {/* Referral Tab */}
+            <TabsContent value="referral" className="mt-6">
+              <ReferralBonus />
+            </TabsContent>
+
+            {/* Leaderboard Tab */}
+            <TabsContent value="leaderboard" className="mt-6">
+              <StakingLeaderboard />
             </TabsContent>
 
             {/* Analytics Tab */}

@@ -10,7 +10,7 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
-import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2, ArrowLeft, Settings } from "lucide-react";
+import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2, ArrowLeft, Settings, FileText, BarChart3, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
@@ -18,6 +18,10 @@ import { voucherABI } from "@/contracts/voucherABI";
 import { CONTRACT_ADDRESSES, ChainId } from "@/contracts/addresses";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { CreateVoucherModal } from "@/components/CreateVoucherModal";
+import { BulkVoucherModal } from "@/components/voucher/BulkVoucherModal";
+import { VoucherTemplates, VoucherTemplate } from "@/components/voucher/VoucherTemplates";
+import { MerchantAnalytics } from "@/components/voucher/MerchantAnalytics";
+import { VoucherGiftModal } from "@/components/voucher/VoucherGiftModal";
 import { bsc } from "wagmi/chains";
 
 interface VoucherItem {
@@ -39,6 +43,10 @@ const Voucher = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [selectedVoucherForGift, setSelectedVoucherForGift] = useState<VoucherItem | null>(null);
+  const [activeTab, setActiveTab] = useState("vouchers");
 
   const currentChainId = (chainId === 56 || chainId === 97 ? chainId : 56) as ChainId;
   const voucherAddress = CONTRACT_ADDRESSES[currentChainId]?.PMVoucher || "0x0000000000000000000000000000000000000000";
@@ -159,10 +167,24 @@ const Voucher = () => {
           <p className="text-xs text-muted-foreground">Expires: {voucher.expiryDate}</p>
         </div>
         {voucher.status === "active" && (
-          <Button size="sm" variant="outline" className="text-xs">
-            <QrCode className="h-3 w-3 mr-1" />
-            Use
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-xs"
+              onClick={() => {
+                setSelectedVoucherForGift(voucher);
+                setShowGiftModal(true);
+              }}
+            >
+              <Send className="h-3 w-3 mr-1" />
+              Gift
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs">
+              <QrCode className="h-3 w-3 mr-1" />
+              Use
+            </Button>
+          </div>
         )}
       </div>
     </Card>
@@ -204,10 +226,16 @@ const Voucher = () => {
                 <h2 className="font-semibold">Redeem Voucher</h2>
               </div>
               {canCreateVouchers && (
-                <Button onClick={() => setShowCreateModal(true)} size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Voucher
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => setShowBulkModal(true)} size="sm" variant="outline" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Bulk Create
+                  </Button>
+                  <Button onClick={() => setShowCreateModal(true)} size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create
+                  </Button>
+                </div>
               )}
             </div>
             <div className="flex gap-3">
@@ -307,6 +335,27 @@ const Voucher = () => {
               )}
             </TabsContent>
           </Tabs>
+          {/* Merchant Features */}
+          {canCreateVouchers && (
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="vouchers">My Vouchers</TabsTrigger>
+                <TabsTrigger value="templates">Templates</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="templates" className="mt-4">
+                <VoucherTemplates onSelectTemplate={(template) => {
+                  setShowCreateModal(true);
+                  toast.info(`${template.name} template applied`);
+                }} />
+              </TabsContent>
+
+              <TabsContent value="analytics" className="mt-4">
+                <MerchantAnalytics />
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
       </main>
 
@@ -324,6 +373,29 @@ const Voucher = () => {
         onClose={() => setShowCreateModal(false)}
         onSuccess={() => refetchVouchers()}
       />
+
+      <BulkVoucherModal
+        isOpen={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        onSuccess={() => refetchVouchers()}
+      />
+
+      {selectedVoucherForGift && (
+        <VoucherGiftModal
+          isOpen={showGiftModal}
+          onClose={() => {
+            setShowGiftModal(false);
+            setSelectedVoucherForGift(null);
+          }}
+          voucher={selectedVoucherForGift}
+          onSuccess={() => refetchVouchers()}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Voucher;
     </div>
   );
 };
