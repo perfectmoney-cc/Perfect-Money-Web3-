@@ -371,7 +371,10 @@ const MerchantPage = () => {
               Recommended Actions
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+              <div 
+                className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard/merchant/multi-currency')}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-blue-500/20">
                     <Globe className="h-4 w-4 text-blue-500" />
@@ -383,7 +386,10 @@ const MerchantPage = () => {
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+              <div 
+                className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard/merchant/loyalty')}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-green-500/20">
                     <TrendingUp className="h-4 w-4 text-green-500" />
@@ -395,7 +401,10 @@ const MerchantPage = () => {
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+              <div 
+                className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard/merchant/pos')}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-purple-500/20">
                     <Smartphone className="h-4 w-4 text-purple-500" />
@@ -407,7 +416,10 @@ const MerchantPage = () => {
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+              <div 
+                className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard/merchant/recurring')}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-orange-500/20">
                     <CreditCard className="h-4 w-4 text-orange-500" />
@@ -419,7 +431,10 @@ const MerchantPage = () => {
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+              <div 
+                className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard/merchant/analytics')}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-cyan-500/20">
                     <BarChart3 className="h-4 w-4 text-cyan-500" />
@@ -431,7 +446,10 @@ const MerchantPage = () => {
                 </p>
               </div>
               
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+              <div 
+                className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                onClick={() => navigate('/dashboard/merchant/promotions')}
+              >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-pink-500/20">
                     <Megaphone className="h-4 w-4 text-pink-500" />
