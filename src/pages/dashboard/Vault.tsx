@@ -395,10 +395,10 @@ const Vault = () => {
     try {
       const hash = await writeContractAsync({
         address: tokenAddress,
-        abi: erc20Abi as any,
+        abi: erc20Abi,
         functionName: "approve",
         args: [VAULT_ADDRESS, amount],
-      });
+      } as any);
       setTxHash(hash);
       toast.success(`Approving ${selectedToken}...`);
     } catch (error: any) {
@@ -447,10 +447,10 @@ const Vault = () => {
     try {
       const hash = await writeContractAsync({
         address: VAULT_ADDRESS,
-        abi: vaultABI as any,
+        abi: vaultABI,
         functionName: "stake",
         args: [BigInt(selectedPlan.id), amountInWei, selectedToken === "USDT"],
-      });
+      } as any);
       setTxHash(hash);
       
       setStakeHistory([
@@ -488,10 +488,10 @@ const Vault = () => {
     try {
       const hash = await writeContractAsync({
         address: VAULT_ADDRESS,
-        abi: vaultABI as any,
+        abi: vaultABI,
         functionName: "claimRewards",
         args: [BigInt(stakeIndex)],
-      });
+      } as any);
       setTxHash(hash);
       
       const afterTax = pendingProfit * 0.95;
@@ -533,10 +533,10 @@ const Vault = () => {
     try {
       const hash = await writeContractAsync({
         address: VAULT_ADDRESS,
-        abi: vaultABI as any,
+        abi: vaultABI,
         functionName: "withdrawCapital",
         args: [BigInt(stakeIndex)],
-      });
+      } as any);
       setTxHash(hash);
       
       setStakeHistory([
