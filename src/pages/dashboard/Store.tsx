@@ -3,7 +3,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Header } from "@/components/Header";
 import { TradingViewTicker } from "@/components/TradingViewTicker";
 import { HeroBanner } from "@/components/HeroBanner";
@@ -18,151 +20,378 @@ import {
   Ticket, 
   Star, 
   Search,
-  Filter,
-  CreditCard,
-  Smartphone,
-  Headphones,
   Shirt,
-  Home,
-  Car,
-  Plane,
-  Utensils,
-  Heart,
+  Package,
+  Wallet,
+  CreditCard,
+  MapPin,
+  CheckCircle2,
+  Loader2,
+  X,
+  Plus,
+  Minus,
+  Trash2,
+  ShoppingCart,
   Percent,
-  Clock,
-  TrendingUp,
-  Zap
+  Zap,
+  Trophy,
+  Heart,
+  Clock
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useAccount } from "wagmi";
+import confetti from "canvas-confetti";
+
+interface Product {
+  id: number;
+  name: string;
+  category: string;
+  price: number;
+  originalPrice: number;
+  discount: number;
+  image: string;
+  rating: number;
+  sales: number;
+  description: string;
+  sizes?: string[];
+  colors?: string[];
+  stock: number;
+}
+
+interface CartItem extends Product {
+  quantity: number;
+  selectedSize?: string;
+  selectedColor?: string;
+}
 
 const StorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCartModal, setShowCartModal] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null);
+  const [orderNumber, setOrderNumber] = useState("");
+  
+  const { address, isConnected } = useAccount();
+
+  const [shippingInfo, setShippingInfo] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: ""
+  });
 
   const categories = [
     { id: "all", name: "All", icon: ShoppingBag },
-    { id: "gift-cards", name: "Gift Cards", icon: Gift },
-    { id: "vouchers", name: "Vouchers", icon: Ticket },
-    { id: "electronics", name: "Electronics", icon: Smartphone },
-    { id: "fashion", name: "Fashion", icon: Shirt },
-    { id: "travel", name: "Travel", icon: Plane },
-    { id: "food", name: "Food & Dining", icon: Utensils },
+    { id: "apparel", name: "Apparel", icon: Shirt },
+    { id: "accessories", name: "Accessories", icon: Gift },
+    { id: "collectibles", name: "Collectibles", icon: Trophy },
+    { id: "merchandise", name: "Merchandise", icon: Package },
   ];
 
-  const featuredProducts = [
+  const products: Product[] = [
     {
       id: 1,
-      name: "Amazon Gift Card",
-      category: "gift-cards",
-      price: 50,
-      originalPrice: 55,
-      discount: 10,
-      image: "🎁",
+      name: "PM Logo T-Shirt",
+      category: "apparel",
+      price: 250,
+      originalPrice: 300,
+      discount: 17,
+      image: "👕",
       rating: 4.9,
-      sales: 1250,
-      description: "Redeem for millions of items on Amazon"
+      sales: 450,
+      description: "Premium cotton t-shirt with Perfect Money logo embroidered",
+      sizes: ["S", "M", "L", "XL", "XXL"],
+      colors: ["Black", "White", "Red"],
+      stock: 100
     },
     {
       id: 2,
-      name: "Netflix Subscription",
-      category: "vouchers",
-      price: 15,
-      originalPrice: 15,
-      discount: 0,
-      image: "🎬",
+      name: "PM Hoodie Premium",
+      category: "apparel",
+      price: 500,
+      originalPrice: 600,
+      discount: 17,
+      image: "🧥",
       rating: 4.8,
-      sales: 890,
-      description: "1 Month Premium subscription"
+      sales: 320,
+      description: "Warm fleece hoodie with PM branding, perfect for crypto enthusiasts",
+      sizes: ["S", "M", "L", "XL", "XXL"],
+      colors: ["Black", "Navy", "Gray"],
+      stock: 75
     },
     {
       id: 3,
-      name: "Spotify Premium",
-      category: "vouchers",
-      price: 10,
-      originalPrice: 12,
+      name: "PM Baseball Cap",
+      category: "accessories",
+      price: 150,
+      originalPrice: 180,
       discount: 17,
-      image: "🎵",
+      image: "🧢",
       rating: 4.7,
-      sales: 756,
-      description: "1 Month Premium subscription"
+      sales: 890,
+      description: "Adjustable baseball cap with embroidered PM logo",
+      colors: ["Black", "White", "Red"],
+      stock: 200
     },
     {
       id: 4,
-      name: "Steam Wallet",
-      category: "gift-cards",
-      price: 25,
-      originalPrice: 25,
-      discount: 0,
-      image: "🎮",
+      name: "PM Crypto Mug",
+      category: "merchandise",
+      price: 100,
+      originalPrice: 120,
+      discount: 17,
+      image: "☕",
       rating: 4.9,
-      sales: 2100,
-      description: "Add funds to your Steam account"
+      sales: 1250,
+      description: "Ceramic mug with PM logo, perfect for your morning coffee",
+      colors: ["Black", "White"],
+      stock: 500
     },
     {
       id: 5,
-      name: "Uber Credits",
-      category: "vouchers",
-      price: 20,
-      originalPrice: 22,
-      discount: 9,
-      image: "🚗",
-      rating: 4.6,
-      sales: 540,
-      description: "Ride credits for Uber"
+      name: "PM Founder Badge (NFT)",
+      category: "collectibles",
+      price: 1000,
+      originalPrice: 1500,
+      discount: 33,
+      image: "🏆",
+      rating: 5.0,
+      sales: 50,
+      description: "Exclusive NFT badge for early supporters, limited to 100 pieces",
+      stock: 10
     },
     {
       id: 6,
-      name: "Apple Gift Card",
-      category: "gift-cards",
-      price: 100,
-      originalPrice: 110,
-      discount: 9,
-      image: "🍎",
-      rating: 4.9,
-      sales: 980,
-      description: "Use for App Store, Apple Music & more"
+      name: "PM Laptop Sticker Pack",
+      category: "accessories",
+      price: 50,
+      originalPrice: 60,
+      discount: 17,
+      image: "🎨",
+      rating: 4.6,
+      sales: 2100,
+      description: "Pack of 10 high-quality vinyl stickers with PM designs",
+      stock: 1000
     },
     {
       id: 7,
-      name: "PlayStation Store",
-      category: "gift-cards",
-      price: 50,
-      originalPrice: 50,
-      discount: 0,
-      image: "🎯",
+      name: "PM Backpack",
+      category: "accessories",
+      price: 400,
+      originalPrice: 480,
+      discount: 17,
+      image: "🎒",
       rating: 4.8,
-      sales: 1450,
-      description: "PSN Wallet top-up"
+      sales: 180,
+      description: "Premium laptop backpack with PM branding and USB charging port",
+      colors: ["Black", "Gray"],
+      stock: 50
     },
     {
       id: 8,
-      name: "Airbnb Credit",
-      category: "travel",
-      price: 100,
-      originalPrice: 115,
-      discount: 13,
-      image: "🏠",
+      name: "PM Polo Shirt",
+      category: "apparel",
+      price: 300,
+      originalPrice: 350,
+      discount: 14,
+      image: "👔",
       rating: 4.7,
-      sales: 320,
-      description: "Travel credits for accommodations"
+      sales: 290,
+      description: "Business casual polo with subtle PM logo",
+      sizes: ["S", "M", "L", "XL", "XXL"],
+      colors: ["Black", "White", "Navy"],
+      stock: 120
     },
+    {
+      id: 9,
+      name: "PM Phone Case",
+      category: "accessories",
+      price: 80,
+      originalPrice: 100,
+      discount: 20,
+      image: "📱",
+      rating: 4.5,
+      sales: 750,
+      description: "Durable phone case with PM design for iPhone & Android",
+      stock: 300
+    },
+    {
+      id: 10,
+      name: "PM Limited Edition Coin",
+      category: "collectibles",
+      price: 500,
+      originalPrice: 600,
+      discount: 17,
+      image: "🪙",
+      rating: 4.9,
+      sales: 100,
+      description: "Physical commemorative coin with certificate of authenticity",
+      stock: 25
+    },
+    {
+      id: 11,
+      name: "PM Lanyard & Card Holder",
+      category: "accessories",
+      price: 75,
+      originalPrice: 90,
+      discount: 17,
+      image: "🔖",
+      rating: 4.6,
+      sales: 560,
+      description: "Professional lanyard with ID card holder featuring PM branding",
+      colors: ["Black", "Red"],
+      stock: 400
+    },
+    {
+      id: 12,
+      name: "PM Water Bottle",
+      category: "merchandise",
+      price: 120,
+      originalPrice: 150,
+      discount: 20,
+      image: "🍶",
+      rating: 4.8,
+      sales: 680,
+      description: "Stainless steel insulated bottle with PM logo, 750ml",
+      colors: ["Black", "White", "Red"],
+      stock: 250
+    }
   ];
 
-  const flashDeals = [
-    { name: "Google Play", discount: 20, endsIn: "2h 15m", image: "📱" },
-    { name: "Xbox Game Pass", discount: 25, endsIn: "4h 30m", image: "🎮" },
-    { name: "DoorDash", discount: 15, endsIn: "1h 45m", image: "🍔" },
+  const vouchers = [
+    { code: "PM10OFF", discount: 10 },
+    { code: "NEWUSER", discount: 15 },
+    { code: "HODLER20", discount: 20 },
+    { code: "VIP25", discount: 25 },
   ];
 
-  const filteredProducts = featuredProducts.filter(product => {
+  const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const handlePurchase = (product: typeof featuredProducts[0]) => {
-    toast.success(`Added ${product.name} to cart!`);
+  const addToCart = (product: Product, size?: string, color?: string) => {
+    const existingItem = cart.find(
+      item => item.id === product.id && item.selectedSize === size && item.selectedColor === color
+    );
+
+    if (existingItem) {
+      setCart(cart.map(item =>
+        item.id === product.id && item.selectedSize === size && item.selectedColor === color
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      setCart([...cart, { ...product, quantity: 1, selectedSize: size, selectedColor: color }]);
+    }
+    toast.success(`${product.name} added to cart!`);
+  };
+
+  const removeFromCart = (productId: number, size?: string, color?: string) => {
+    setCart(cart.filter(
+      item => !(item.id === productId && item.selectedSize === size && item.selectedColor === color)
+    ));
+  };
+
+  const updateQuantity = (productId: number, size: string | undefined, color: string | undefined, delta: number) => {
+    setCart(cart.map(item => {
+      if (item.id === productId && item.selectedSize === size && item.selectedColor === color) {
+        const newQty = item.quantity + delta;
+        return newQty > 0 ? { ...item, quantity: newQty } : item;
+      }
+      return item;
+    }).filter(item => item.quantity > 0));
+  };
+
+  const applyVoucher = () => {
+    const voucher = vouchers.find(v => v.code.toUpperCase() === voucherCode.toUpperCase());
+    if (voucher) {
+      setAppliedVoucher(voucher);
+      toast.success(`Voucher ${voucher.code} applied! ${voucher.discount}% discount`);
+    } else {
+      toast.error("Invalid voucher code");
+    }
+  };
+
+  const getSubtotal = () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
+  const getDiscount = () => appliedVoucher ? (getSubtotal() * appliedVoucher.discount) / 100 : 0;
+  
+  const getTotal = () => getSubtotal() - getDiscount();
+
+  const handleBuyNow = (product: Product) => {
+    setSelectedProduct(product);
+    setShowProductModal(true);
+  };
+
+  const handleAddFromModal = () => {
+    if (selectedProduct) {
+      const size = selectedProduct.sizes?.[0];
+      const color = selectedProduct.colors?.[0];
+      addToCart(selectedProduct, size, color);
+      setShowProductModal(false);
+      setShowCartModal(true);
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet to checkout");
+      return;
+    }
+
+    if (!shippingInfo.fullName || !shippingInfo.email || !shippingInfo.address || !shippingInfo.city || !shippingInfo.country) {
+      toast.error("Please fill in all required shipping details");
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const newOrderNumber = `PM${Date.now().toString().slice(-8)}`;
+    setOrderNumber(newOrderNumber);
+    
+    // Show success
+    setIsProcessing(false);
+    setShowCheckoutModal(false);
+    setShowSuccessModal(true);
+    
+    // Confetti animation
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+    
+    // Clear cart
+    setCart([]);
+    setAppliedVoucher(null);
+    setVoucherCode("");
+    setShippingInfo({
+      fullName: "",
+      email: "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: ""
+    });
   };
 
   return (
@@ -171,7 +400,7 @@ const StorePage = () => {
       <TradingViewTicker />
       <HeroBanner 
         title="PM Store" 
-        subtitle="Buy gift cards, vouchers & more with PM Tokens" 
+        subtitle="Official Perfect Money Merchandise" 
       />
       
       <main className="container mx-auto px-4 pt-12 pb-12 flex-1">
@@ -180,51 +409,39 @@ const StorePage = () => {
           <WalletCard showQuickFunctionsToggle={false} compact={true} />
         </div>
 
-        <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+          <Button 
+            variant="outline" 
+            className="relative"
+            onClick={() => setShowCartModal(true)}
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Cart
+            {cart.length > 0 && (
+              <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                {cart.reduce((sum, item) => sum + item.quantity, 0)}
+              </Badge>
+            )}
+          </Button>
+        </div>
 
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 rounded-lg bg-gradient-to-r from-primary/20 to-orange-500/20">
+            <div className="p-3 rounded-lg bg-gradient-to-r from-primary/20 to-rose-500/20">
               <Store className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="font-bold text-xl">PM Store</h1>
-              <p className="text-muted-foreground text-sm">Spend your PM Tokens on real products</p>
+              <h1 className="font-bold text-xl">PM Merchandise Store</h1>
+              <p className="text-muted-foreground text-sm">Official Perfect Money branded products</p>
             </div>
           </div>
 
-          {/* Flash Deals Banner */}
-          <Card className="p-6 bg-gradient-to-r from-primary/10 via-orange-500/10 to-yellow-500/10 border-primary/30 mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="h-5 w-5 text-yellow-500" />
-              <h2 className="font-bold text-lg">Flash Deals</h2>
-              <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-500">Limited Time</Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {flashDeals.map((deal, index) => (
-                <Card key={index} className="p-4 bg-card/80 backdrop-blur-sm border-primary/20 hover:border-primary/50 transition-all cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{deal.image}</span>
-                    <div className="flex-1">
-                      <p className="font-semibold">{deal.name}</p>
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-red-500/20 text-red-500 text-xs">{deal.discount}% OFF</Badge>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> {deal.endsIn}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </Card>
-
-          {/* Search and Filter */}
+          {/* Search and Categories */}
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -256,10 +473,10 @@ const StorePage = () => {
             <Card className="p-4 bg-card/50 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10">
-                  <ShoppingBag className="h-5 w-5 text-primary" />
+                  <Package className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">150+</p>
+                  <p className="text-2xl font-bold">{products.length}</p>
                   <p className="text-xs text-muted-foreground">Products</p>
                 </div>
               </div>
@@ -267,10 +484,10 @@ const StorePage = () => {
             <Card className="p-4 bg-card/50 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-5 w-5 text-green-500" />
+                  <Zap className="h-5 w-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">25K+</p>
+                  <p className="text-2xl font-bold">5K+</p>
                   <p className="text-xs text-muted-foreground">Orders</p>
                 </div>
               </div>
@@ -292,7 +509,7 @@ const StorePage = () => {
                   <Percent className="h-5 w-5 text-purple-500" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">15%</p>
+                  <p className="text-2xl font-bold">20%</p>
                   <p className="text-xs text-muted-foreground">Avg Savings</p>
                 </div>
               </div>
@@ -304,7 +521,7 @@ const StorePage = () => {
             {filteredProducts.map((product) => (
               <Card 
                 key={product.id} 
-                className="p-4 bg-card/50 backdrop-blur-sm hover:border-primary/50 transition-all group cursor-pointer"
+                className="p-4 bg-card/50 backdrop-blur-sm hover:border-primary/50 transition-all group"
               >
                 <div className="relative mb-4">
                   <div className="w-full h-32 rounded-lg bg-muted/30 flex items-center justify-center text-5xl">
@@ -315,10 +532,15 @@ const StorePage = () => {
                       -{product.discount}%
                     </Badge>
                   )}
+                  {product.stock < 20 && (
+                    <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
+                      Low Stock
+                    </Badge>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
-                  <h3 className="font-semibold group-hover:text-primary transition-colors">{product.name}</h3>
+                  <h3 className="font-semibold group-hover:text-primary transition-colors line-clamp-1">{product.name}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
                   
                   <div className="flex items-center gap-2">
@@ -338,7 +560,7 @@ const StorePage = () => {
                     </div>
                     <Button 
                       size="sm" 
-                      onClick={() => handlePurchase(product)}
+                      onClick={() => handleBuyNow(product)}
                       className="bg-primary hover:bg-primary/90"
                     >
                       Buy
@@ -357,49 +579,14 @@ const StorePage = () => {
             </div>
           )}
 
-          {/* How It Works */}
-          <Card className="p-6 bg-card/50 backdrop-blur-sm mt-8">
-            <h2 className="text-xl font-bold mb-6">How PM Store Works</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-primary">1</span>
-                </div>
-                <h3 className="font-semibold mb-1">Browse Products</h3>
-                <p className="text-xs text-muted-foreground">Explore our catalog of gift cards and vouchers</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-primary">2</span>
-                </div>
-                <h3 className="font-semibold mb-1">Pay with PM</h3>
-                <p className="text-xs text-muted-foreground">Use your PM Tokens to make purchases</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-primary">3</span>
-                </div>
-                <h3 className="font-semibold mb-1">Instant Delivery</h3>
-                <p className="text-xs text-muted-foreground">Receive your codes instantly via email</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-primary">4</span>
-                </div>
-                <h3 className="font-semibold mb-1">Redeem & Enjoy</h3>
-                <p className="text-xs text-muted-foreground">Use your gift cards on partner platforms</p>
-              </div>
-            </div>
-          </Card>
-
           {/* Benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
             <Card className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30">
               <div className="flex items-center gap-3">
-                <Percent className="h-8 w-8 text-green-500" />
+                <Wallet className="h-8 w-8 text-green-500" />
                 <div>
-                  <h3 className="font-semibold">Best Prices</h3>
-                  <p className="text-xs text-muted-foreground">Save up to 25% on popular brands</p>
+                  <h3 className="font-semibold">Pay with PM Tokens</h3>
+                  <p className="text-xs text-muted-foreground">Use your tokens for purchases</p>
                 </div>
               </div>
             </Card>
@@ -407,8 +594,8 @@ const StorePage = () => {
               <div className="flex items-center gap-3">
                 <Zap className="h-8 w-8 text-blue-500" />
                 <div>
-                  <h3 className="font-semibold">Instant Delivery</h3>
-                  <p className="text-xs text-muted-foreground">Get codes within seconds</p>
+                  <h3 className="font-semibold">Fast Shipping</h3>
+                  <p className="text-xs text-muted-foreground">Worldwide delivery available</p>
                 </div>
               </div>
             </Card>
@@ -416,14 +603,380 @@ const StorePage = () => {
               <div className="flex items-center gap-3">
                 <Heart className="h-8 w-8 text-purple-500" />
                 <div>
-                  <h3 className="font-semibold">100% Secure</h3>
-                  <p className="text-xs text-muted-foreground">Blockchain-powered transactions</p>
+                  <h3 className="font-semibold">Premium Quality</h3>
+                  <p className="text-xs text-muted-foreground">Official licensed merchandise</p>
                 </div>
               </div>
             </Card>
           </div>
         </div>
       </main>
+
+      {/* Product Detail Modal */}
+      <Dialog open={showProductModal} onOpenChange={setShowProductModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedProduct?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && (
+            <div className="space-y-4">
+              <div className="w-full h-40 rounded-lg bg-muted/30 flex items-center justify-center text-7xl">
+                {selectedProduct.image}
+              </div>
+              <p className="text-sm text-muted-foreground">{selectedProduct.description}</p>
+              
+              {selectedProduct.sizes && (
+                <div>
+                  <Label className="text-sm font-medium">Size</Label>
+                  <div className="flex gap-2 mt-2">
+                    {selectedProduct.sizes.map(size => (
+                      <Badge key={size} variant="outline" className="cursor-pointer hover:bg-primary hover:text-primary-foreground">
+                        {size}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {selectedProduct.colors && (
+                <div>
+                  <Label className="text-sm font-medium">Color</Label>
+                  <div className="flex gap-2 mt-2">
+                    {selectedProduct.colors.map(color => (
+                      <Badge key={color} variant="outline" className="cursor-pointer hover:bg-primary hover:text-primary-foreground">
+                        {color}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between pt-4">
+                <div>
+                  <span className="text-2xl font-bold text-primary">{selectedProduct.price} PM</span>
+                  {selectedProduct.discount > 0 && (
+                    <span className="text-sm text-muted-foreground line-through ml-2">
+                      {selectedProduct.originalPrice} PM
+                    </span>
+                  )}
+                </div>
+                <Button onClick={handleAddFromModal} className="bg-primary">
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Add to Cart
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cart Modal */}
+      <Dialog open={showCartModal} onOpenChange={setShowCartModal}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Shopping Cart ({cart.length} items)
+            </DialogTitle>
+          </DialogHeader>
+          
+          {cart.length === 0 ? (
+            <div className="text-center py-8">
+              <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+              <p className="text-muted-foreground">Your cart is empty</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cart.map((item, index) => (
+                <Card key={`${item.id}-${item.selectedSize}-${item.selectedColor}-${index}`} className="p-4">
+                  <div className="flex gap-4">
+                    <div className="w-16 h-16 rounded-lg bg-muted/30 flex items-center justify-center text-3xl shrink-0">
+                      {item.image}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm">{item.name}</h4>
+                      <div className="flex gap-2 text-xs text-muted-foreground">
+                        {item.selectedSize && <span>Size: {item.selectedSize}</span>}
+                        {item.selectedColor && <span>Color: {item.selectedColor}</span>}
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => updateQuantity(item.id, item.selectedSize, item.selectedColor, -1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => updateQuantity(item.id, item.selectedSize, item.selectedColor, 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <span className="font-bold text-primary">{item.price * item.quantity} PM</span>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="text-red-500 hover:text-red-600"
+                      onClick={() => removeFromCart(item.id, item.selectedSize, item.selectedColor)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+
+              {/* Voucher */}
+              <div className="flex gap-2">
+                <Input 
+                  placeholder="Enter voucher code"
+                  value={voucherCode}
+                  onChange={(e) => setVoucherCode(e.target.value)}
+                />
+                <Button variant="outline" onClick={applyVoucher}>
+                  <Ticket className="h-4 w-4 mr-1" />
+                  Apply
+                </Button>
+              </div>
+              
+              {appliedVoucher && (
+                <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                  <span className="text-sm text-green-500 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Voucher {appliedVoucher.code} applied
+                  </span>
+                  <span className="text-green-500 font-medium">-{appliedVoucher.discount}%</span>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>{getSubtotal()} PM</span>
+                </div>
+                {appliedVoucher && (
+                  <div className="flex justify-between text-sm text-green-500">
+                    <span>Discount</span>
+                    <span>-{getDiscount().toFixed(0)} PM</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total</span>
+                  <span className="text-primary">{getTotal().toFixed(0)} PM</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCartModal(false)}>
+              Continue Shopping
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowCartModal(false);
+                setShowCheckoutModal(true);
+              }}
+              disabled={cart.length === 0}
+              className="bg-primary"
+            >
+              Proceed to Checkout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Checkout Modal */}
+      <Dialog open={showCheckoutModal} onOpenChange={setShowCheckoutModal}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Checkout - Shipping Details
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Full Name *</Label>
+                <Input 
+                  value={shippingInfo.fullName}
+                  onChange={(e) => setShippingInfo({...shippingInfo, fullName: e.target.value})}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <Label>Email *</Label>
+                <Input 
+                  type="email"
+                  value={shippingInfo.email}
+                  onChange={(e) => setShippingInfo({...shippingInfo, email: e.target.value})}
+                  placeholder="john@example.com"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label>Phone Number</Label>
+              <Input 
+                value={shippingInfo.phone}
+                onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
+                placeholder="+1 234 567 890"
+              />
+            </div>
+            
+            <div>
+              <Label>Shipping Address *</Label>
+              <Textarea 
+                value={shippingInfo.address}
+                onChange={(e) => setShippingInfo({...shippingInfo, address: e.target.value})}
+                placeholder="123 Main Street, Apt 4B"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>City *</Label>
+                <Input 
+                  value={shippingInfo.city}
+                  onChange={(e) => setShippingInfo({...shippingInfo, city: e.target.value})}
+                  placeholder="New York"
+                />
+              </div>
+              <div>
+                <Label>State/Province</Label>
+                <Input 
+                  value={shippingInfo.state}
+                  onChange={(e) => setShippingInfo({...shippingInfo, state: e.target.value})}
+                  placeholder="NY"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>ZIP/Postal Code</Label>
+                <Input 
+                  value={shippingInfo.zipCode}
+                  onChange={(e) => setShippingInfo({...shippingInfo, zipCode: e.target.value})}
+                  placeholder="10001"
+                />
+              </div>
+              <div>
+                <Label>Country *</Label>
+                <Input 
+                  value={shippingInfo.country}
+                  onChange={(e) => setShippingInfo({...shippingInfo, country: e.target.value})}
+                  placeholder="United States"
+                />
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <Card className="p-4 bg-muted/30">
+              <h4 className="font-semibold mb-3">Order Summary</h4>
+              <div className="space-y-2 text-sm">
+                {cart.map((item, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span>{item.name} x{item.quantity}</span>
+                    <span>{item.price * item.quantity} PM</span>
+                  </div>
+                ))}
+                {appliedVoucher && (
+                  <div className="flex justify-between text-green-500">
+                    <span>Discount ({appliedVoucher.code})</span>
+                    <span>-{getDiscount().toFixed(0)} PM</span>
+                  </div>
+                )}
+                <div className="border-t pt-2 flex justify-between font-bold">
+                  <span>Total</span>
+                  <span className="text-primary">{getTotal().toFixed(0)} PM</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Payment Method */}
+            <Card className="p-4 border-primary/30 bg-primary/5">
+              <div className="flex items-center gap-3">
+                <Wallet className="h-6 w-6 text-primary" />
+                <div>
+                  <p className="font-semibold">Pay with PM Tokens</p>
+                  <p className="text-xs text-muted-foreground">
+                    {address ? `Connected: ${address.slice(0, 6)}...${address.slice(-4)}` : "Please connect wallet"}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCheckoutModal(false)}>
+              Back to Cart
+            </Button>
+            <Button 
+              onClick={handleCheckout}
+              disabled={isProcessing || !isConnected}
+              className="bg-gradient-to-r from-primary to-rose-600"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Pay {getTotal().toFixed(0)} PM
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="max-w-md text-center">
+          <div className="py-6">
+            <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="h-10 w-10 text-green-500" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Order Confirmed!</h2>
+            <p className="text-muted-foreground mb-4">
+              Thank you for your purchase. Your order has been successfully placed.
+            </p>
+            
+            <Card className="p-4 bg-muted/30 mb-6">
+              <p className="text-sm text-muted-foreground">Order Number</p>
+              <p className="text-xl font-bold font-mono text-primary">{orderNumber}</p>
+            </Card>
+            
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p className="flex items-center justify-center gap-2">
+                <Clock className="h-4 w-4" />
+                Estimated delivery: 7-14 business days
+              </p>
+              <p>A confirmation email has been sent to your email address.</p>
+            </div>
+          </div>
+          
+          <DialogFooter className="justify-center">
+            <Button onClick={() => setShowSuccessModal(false)} className="bg-primary">
+              Continue Shopping
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Footer />
       <MobileBottomNav />
