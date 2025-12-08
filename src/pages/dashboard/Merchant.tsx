@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import pmLogo from "@/assets/pm-logo-new.png";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/Header";
 import { TradingViewTicker } from "@/components/TradingViewTicker";
 import { HeroBanner } from "@/components/HeroBanner";
@@ -10,7 +11,11 @@ import { Footer } from "@/components/Footer";
 import { MerchantSubscriptionModal } from "@/components/MerchantSubscriptionModal";
 import { WalletCard } from "@/components/WalletCard";
 import { RevenueChart } from "@/components/merchant/RevenueChart";
-import { ArrowLeft, Store, QrCode, Link as LinkIcon, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { 
+  ArrowLeft, Store, QrCode, Link as LinkIcon, ChevronLeft, ChevronRight, Eye, 
+  Ticket, Users, TrendingUp, Zap, Shield, Globe, Smartphone, CreditCard, 
+  BarChart3, MessageSquare, Bell, Megaphone
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount } from "wagmi";
@@ -326,6 +331,147 @@ const MerchantPage = () => {
                 </Button>
               </div>
             </div>
+          </Card>
+
+          {/* Voucher Admin Section */}
+          <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Ticket className="h-5 w-5 text-purple-500" />
+                Voucher Management
+              </h2>
+              <Badge className="bg-purple-500/20 text-purple-500">Merchant Feature</Badge>
+            </div>
+            <p className="text-muted-foreground text-sm mb-4">
+              Create and distribute digital vouchers to attract and retain customers.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/dashboard/voucher')}
+                className="border-purple-500/30 hover:bg-purple-500/10"
+              >
+                <Ticket className="h-4 w-4 mr-2" />
+                View Vouchers
+              </Button>
+              <Button 
+                variant="gradient"
+                onClick={() => navigate('/dashboard/voucher/admin')}
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Voucher Admin
+              </Button>
+            </div>
+          </Card>
+
+          {/* Recommendations Section */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-yellow-500" />
+              Recommended Actions
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-blue-500/20">
+                    <Globe className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <h3 className="font-semibold">Enable Multi-Currency</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Accept payments in BNB, USDT, USDC alongside PM tokens
+                </p>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-green-500/20">
+                    <TrendingUp className="h-4 w-4 text-green-500" />
+                  </div>
+                  <h3 className="font-semibold">Launch Loyalty Program</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Reward repeat customers with PM token cashback
+                </p>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <Smartphone className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <h3 className="font-semibold">POS Integration</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Connect your physical store with our mobile POS app
+                </p>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-orange-500/20">
+                    <CreditCard className="h-4 w-4 text-orange-500" />
+                  </div>
+                  <h3 className="font-semibold">Recurring Payments</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Set up subscription billing for your services
+                </p>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-cyan-500/20">
+                    <BarChart3 className="h-4 w-4 text-cyan-500" />
+                  </div>
+                  <h3 className="font-semibold">Advanced Analytics</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get detailed insights on customer behavior and sales trends
+                </p>
+              </div>
+              
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-all cursor-pointer">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-pink-500/20">
+                    <Megaphone className="h-4 w-4 text-pink-500" />
+                  </div>
+                  <h3 className="font-semibold">Promotion Tools</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Create flash sales and limited-time offers easily
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Quick Stats */}
+          <Card className="p-6 bg-card/50 backdrop-blur-sm">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Customer Insights
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold text-primary">--</p>
+                <p className="text-xs text-muted-foreground">Total Customers</p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold text-green-500">--</p>
+                <p className="text-xs text-muted-foreground">Repeat Rate</p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold text-blue-500">--</p>
+                <p className="text-xs text-muted-foreground">Avg. Order Value</p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold text-yellow-500">--</p>
+                <p className="text-xs text-muted-foreground">Customer Rating</p>
+              </div>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              Analytics will populate as you receive more transactions
+            </p>
           </Card>
 
           <Card className="p-6 bg-card/50 backdrop-blur-sm">
