@@ -22,6 +22,7 @@ import {
   Lock,
   SendHorizonal,
   Sparkles,
+  Ticket,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -219,6 +220,13 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
       bg: "bg-orange-500/10",
     },
     {
+      to: "/dashboard/voucher",
+      icon: Ticket,
+      label: "Voucher",
+      color: "text-teal-500",
+      bg: "bg-teal-500/10",
+    },
+    {
       to: "/dashboard/referral",
       icon: Users,
       label: "Referral",
@@ -333,8 +341,8 @@ export const WalletCard = ({ showQuickFunctionsToggle = true, compact = false }:
               {/* Token Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-3">
-                  {/* Green Connected Indicator */}
-                  {isConnected}
+                  {/* PM Logo */}
+                  <img src="/pm-icon-512.png" alt="PM" className="w-10 h-10 rounded-full" />
                   <div className="flex flex-col">
                     <span className="text-white font-bold text-lg">Perfect Money</span>
                     <span className="text-white/80 text-[10px] font-medium">Just Made It Perfect</span>

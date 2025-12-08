@@ -8,12 +8,15 @@ import { WalletCard } from "@/components/WalletCard";
 import { BscTransactionHistory } from "@/components/BscTransactionHistory";
 import { PortfolioValue } from "@/components/PortfolioValue";
 import { TokenPriceCards } from "@/components/TokenPriceCards";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { Wallet, Send, ArrowDownToLine, ShoppingCart, TrendingUp, Users, Store, Gift, Handshake, ArrowDownUp, Shield, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAccount } from "wagmi";
 import { toast } from "sonner";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { isConnected } = useAccount();
   const [walletConnected, setWalletConnected] = useState(true);
   const connectWallet = async () => {
     // Placeholder for Web3 wallet connection
@@ -23,6 +26,7 @@ const Dashboard = () => {
   return <div className="min-h-screen bg-background pb-20 lg:pb-0">
       <Header />
       <TradingViewTicker />
+      <PWAInstallPrompt walletConnected={isConnected || walletConnected} />
       
       <main className="container mx-auto px-4 pt-24 pb-12 py-[45px]">
         {!walletConnected ? <div className="flex items-center justify-center min-h-[60vh]">
