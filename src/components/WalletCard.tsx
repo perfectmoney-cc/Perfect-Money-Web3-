@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Copy, ShoppingCart, Grid3X3, X, Send, ArrowDownToLine, ArrowDownUp, TrendingUp, Store, Gift, Users, Handshake, Shield, MessageCircle, Link2, Settings, Lock, SendHorizonal, Sparkles, Ticket } from "lucide-react";
+import { Copy, ShoppingCart, Grid3X3, X, Send, ArrowDownToLine, ArrowDownUp, TrendingUp, Store, Gift, Users, Handshake, Shield, MessageCircle, Link2, Settings, Lock, SendHorizonal, Sparkles, Ticket, Vault } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import pmTokenLogo from "@/assets/pm-token-logo.png";
@@ -201,6 +201,12 @@ export const WalletCard = ({
     label: "Voucher",
     color: "text-teal-500",
     bg: "bg-teal-500/10"
+  }, {
+    to: "/dashboard/vault",
+    icon: Vault,
+    label: "Vault",
+    color: "text-indigo-500",
+    bg: "bg-indigo-500/10"
   }, {
     to: "/dashboard/referral",
     icon: Users,

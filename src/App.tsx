@@ -51,6 +51,8 @@ import MarketplaceMinters from "./pages/dashboard/MarketplaceMinters";
 import MarketplaceStats from "./pages/dashboard/MarketplaceStats";
 import NFTAdmin from "./pages/dashboard/NFTAdmin";
 import VoucherPage from "./pages/dashboard/Voucher";
+import VoucherAdminPage from "./pages/dashboard/VoucherAdmin";
+import VaultPage from "./pages/dashboard/Vault";
 import PresaleTerms from "./pages/PresaleTerms";
 import LegalCompliance from "./pages/LegalCompliance";
 import BrandAssets from "./pages/BrandAssets";
@@ -106,6 +108,8 @@ const App = () => (
               <Route path="/dashboard/marketplace/stats" element={<MarketplaceStats />} />
               <Route path="/dashboard/marketplace/admin" element={<NFTAdmin />} />
               <Route path="/dashboard/voucher" element={<VoucherPage />} />
+              <Route path="/dashboard/voucher/admin" element={<VoucherAdminPage />} />
+              <Route path="/dashboard/vault" element={<VaultPage />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/tokenomics" element={<Tokenomics />} />
               <Route path="/whitepaper" element={<Whitepaper />} />
