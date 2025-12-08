@@ -293,7 +293,7 @@ export const WalletCard = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-3">
                   {/* PM Logo */}
-                  <img alt="PM" className="w-10 h-10 rounded-full" src="/lovable-uploads/62397bdd-bb52-4769-8622-3b3f8c73031f.png" />
+                  
                   <div className="flex flex-col">
                     <span className="text-white font-bold text-lg">Perfect Money</span>
                     <span className="text-white/80 text-[10px] font-medium">Just Made It Perfect</span>
