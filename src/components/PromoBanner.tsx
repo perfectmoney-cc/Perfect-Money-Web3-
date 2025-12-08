@@ -9,17 +9,17 @@ interface PromoBannerProps {
   bonusPercentage?: number;
 }
 
-export const PromoBanner = ({ 
-  text = "Special Offer: Buy PM Token & Get 20% Bonus!",
+export const PromoBanner = ({
+  text = "Special Offer: Buy PM Token & Get 10% Bonus! You may claim your token bonus at support center. ",
   endDate,
-  bonusPercentage = 20
+  bonusPercentage = 10,
 }: PromoBannerProps) => {
   const [isVisible, setIsVisible] = useState(true);
   const [timeLeft, setTimeLeft] = useState({
     days: 89,
     hours: 15,
     minutes: 47,
-    seconds: 1
+    seconds: 1,
   });
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -73,7 +73,7 @@ export const PromoBanner = ({
             days: Math.floor(difference / (1000 * 60 * 60 * 24)),
             hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
             minutes: Math.floor((difference / 1000 / 60) % 60),
-            seconds: Math.floor((difference / 1000) % 60)
+            seconds: Math.floor((difference / 1000) % 60),
           };
         }
         return { days: 0, hours: 0, minutes: 0, seconds: 0 };
@@ -95,7 +95,7 @@ export const PromoBanner = ({
             days: Math.floor(difference / (1000 * 60 * 60 * 24)),
             hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
             minutes: Math.floor((difference / 1000 / 60) % 60),
-            seconds: Math.floor((difference / 1000) % 60)
+            seconds: Math.floor((difference / 1000) % 60),
           });
         } else {
           setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -104,7 +104,7 @@ export const PromoBanner = ({
         // Default countdown behavior
         setTimeLeft((prev) => {
           let { days, hours, minutes, seconds } = prev;
-          
+
           if (seconds > 0) {
             seconds--;
           } else if (minutes > 0) {
@@ -120,7 +120,7 @@ export const PromoBanner = ({
             minutes = 59;
             seconds = 59;
           }
-          
+
           return { days, hours, minutes, seconds };
         });
       }
@@ -133,7 +133,7 @@ export const PromoBanner = ({
 
   return (
     <div className="bg-gradient-to-r from-[#E53E3E] via-[#d63030] to-[#E53E3E] text-white py-2.5 px-4 sticky top-0 z-50">
-      <div 
+      <div
         ref={scrollRef}
         className="container mx-auto flex items-center justify-between gap-2 md:gap-4 overflow-x-auto md:overflow-hidden scrollbar-hide cursor-grab active:cursor-grabbing"
         onMouseDown={handleMouseDown}
@@ -142,20 +142,22 @@ export const PromoBanner = ({
         onMouseMove={handleMouseMove}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         <div className="flex items-center gap-2 text-xs md:text-sm font-medium whitespace-nowrap flex-shrink-0">
-          <span>{text.replace('{bonus}', String(bonusPercentage))}</span>
+          <span>{text.replace("{bonus}", String(bonusPercentage))}</span>
         </div>
-        
+
         <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm font-mono font-bold shrink-0">
           <span className="bg-black/20 px-1.5 py-0.5 rounded">{timeLeft.days}d</span>
           <span>:</span>
-          <span className="bg-black/20 px-1.5 py-0.5 rounded">{String(timeLeft.hours).padStart(2, '0')}h</span>
+          <span className="bg-black/20 px-1.5 py-0.5 rounded">{String(timeLeft.hours).padStart(2, "0")}h</span>
           <span>:</span>
-          <span className="bg-black/20 px-1.5 py-0.5 rounded">{String(timeLeft.minutes).padStart(2, '0')}m</span>
+          <span className="bg-black/20 px-1.5 py-0.5 rounded">{String(timeLeft.minutes).padStart(2, "0")}m</span>
           <span className="hidden md:inline">:</span>
-          <span className="hidden md:inline bg-black/20 px-1.5 py-0.5 rounded">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+          <span className="hidden md:inline bg-black/20 px-1.5 py-0.5 rounded">
+            {String(timeLeft.seconds).padStart(2, "0")}s
+          </span>
         </div>
 
         <div className="flex items-center gap-1 md:gap-2 shrink-0">
@@ -163,7 +165,7 @@ export const PromoBanner = ({
             variant="default"
             size="sm"
             className="bg-black hover:bg-black/90 text-white font-medium text-xs md:text-sm px-2 md:px-4 h-7 md:h-8"
-            onClick={() => navigate('/dashboard/buy')}
+            onClick={() => navigate("/dashboard/buy")}
           >
             Buy Now
           </Button>
