@@ -396,8 +396,3 @@ const Voucher = () => {
 };
 
 export default Voucher;
-    </div>
-  );
-};
-
-export default Voucher;
