@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,8 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode } from "lucide-react";
+import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
+import { voucherABI } from "@/contracts/voucherABI";
+import { CONTRACT_ADDRESSES, ChainId } from "@/contracts/addresses";
+import { QRScannerModal } from "@/components/QRScannerModal";
+import { CreateVoucherModal } from "@/components/CreateVoucherModal";
+import { bsc } from "wagmi/chains";
+import { formatEther } from "viem";
 
 interface VoucherItem {
   id: string;
@@ -17,51 +24,59 @@ interface VoucherItem {
   expiryDate: string;
   status: "active" | "used" | "expired";
   type: "discount" | "gift" | "reward";
+  isTransferable: boolean;
 }
 
-const mockVouchers: VoucherItem[] = [
-  {
-    id: "1",
-    code: "PM-WELCOME-2024",
-    name: "Welcome Bonus",
-    value: "500 PM",
-    expiryDate: "2025-12-31",
-    status: "active",
-    type: "gift",
-  },
-  {
-    id: "2",
-    code: "PM-DISCOUNT-10",
-    name: "10% Discount",
-    value: "10%",
-    expiryDate: "2025-06-30",
-    status: "active",
-    type: "discount",
-  },
-  {
-    id: "3",
-    code: "PM-STAKE-REWARD",
-    name: "Staking Reward",
-    value: "1000 PM",
-    expiryDate: "2025-03-15",
-    status: "used",
-    type: "reward",
-  },
-  {
-    id: "4",
-    code: "PM-EARLY-BIRD",
-    name: "Early Bird Bonus",
-    value: "250 PM",
-    expiryDate: "2024-12-01",
-    status: "expired",
-    type: "gift",
-  },
-];
-
 const Voucher = () => {
-  const [vouchers] = useState<VoucherItem[]>(mockVouchers);
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const [vouchers, setVouchers] = useState<VoucherItem[]>([]);
   const [redeemCode, setRedeemCode] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const currentChainId = (chainId === 56 || chainId === 97 ? chainId : 56) as ChainId;
+  const voucherAddress = CONTRACT_ADDRESSES[currentChainId]?.PMVoucher || "0x0000000000000000000000000000000000000000";
+
+  const { writeContract, data: redeemTxHash, isPending: isRedeeming } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: redeemSuccess } = useWaitForTransactionReceipt({
+    hash: redeemTxHash,
+  });
+
+  // Fetch user vouchers
+  const { data: userVoucherIds, refetch: refetchVouchers } = useReadContract({
+    address: voucherAddress as `0x${string}`,
+    abi: voucherABI,
+    functionName: "getUserVouchers",
+    args: address ? [address] : undefined,
+  });
+
+  // Check if user is approved merchant
+  const { data: isMerchant } = useReadContract({
+    address: voucherAddress as `0x${string}`,
+    abi: voucherABI,
+    functionName: "approvedMerchants",
+    args: address ? [address] : undefined,
+  });
+
+  // Check if user is owner
+  const { data: contractOwner } = useReadContract({
+    address: voucherAddress as `0x${string}`,
+    abi: voucherABI,
+    functionName: "owner",
+  });
+
+  const canCreateVouchers = isMerchant || (address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase());
+
+  useEffect(() => {
+    if (redeemSuccess) {
+      toast.success("Voucher redeemed successfully!");
+      setRedeemCode("");
+      refetchVouchers();
+    }
+  }, [redeemSuccess]);
 
   const filteredVouchers = vouchers.filter(
     (v) =>
@@ -73,13 +88,34 @@ const Voucher = () => {
   const usedVouchers = filteredVouchers.filter((v) => v.status === "used");
   const expiredVouchers = filteredVouchers.filter((v) => v.status === "expired");
 
-  const handleRedeem = () => {
+  const handleRedeem = async () => {
     if (!redeemCode.trim()) {
       toast.error("Please enter a voucher code");
       return;
     }
-    toast.success("Voucher redeemed successfully!");
-    setRedeemCode("");
+    if (!address) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    try {
+      writeContract({
+        address: voucherAddress as `0x${string}`,
+        abi: voucherABI,
+        functionName: "redeemVoucher",
+        args: [redeemCode],
+        chain: bsc,
+        account: address,
+      });
+    } catch (error) {
+      console.error("Redeem error:", error);
+      toast.error("Failed to redeem voucher");
+    }
+  };
+
+  const handleScanResult = (code: string) => {
+    setRedeemCode(code);
+    toast.success(`QR Code scanned: ${code}`);
   };
 
   const getStatusIcon = (status: VoucherItem["status"]) => {
@@ -149,14 +185,22 @@ const Voucher = () => {
       <main className="container mx-auto px-4 pt-24 pb-12">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Page Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 rounded-xl bg-primary/10">
-              <Ticket className="h-6 w-6 text-primary" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-primary/10">
+                <Ticket className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">My Vouchers</h1>
+                <p className="text-muted-foreground text-sm">Manage and redeem your PM vouchers</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">My Vouchers</h1>
-              <p className="text-muted-foreground text-sm">Manage and redeem your PM vouchers</p>
-            </div>
+            {canCreateVouchers && (
+              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Voucher
+              </Button>
+            )}
           </div>
 
           {/* Redeem Voucher Section */}
@@ -169,11 +213,26 @@ const Voucher = () => {
               <Input
                 placeholder="Enter voucher code"
                 value={redeemCode}
-                onChange={(e) => setRedeemCode(e.target.value)}
+                onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
                 className="flex-1"
               />
-              <Button onClick={handleRedeem} className="bg-primary hover:bg-primary/90">
-                Redeem
+              <Button
+                variant="outline"
+                onClick={() => setShowScanner(true)}
+                className="px-3"
+              >
+                <Scan className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={handleRedeem} 
+                disabled={isRedeeming || isConfirming || !isConnected}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {(isRedeeming || isConfirming) ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Redeem"
+                )}
               </Button>
             </div>
           </Card>
@@ -220,6 +279,7 @@ const Voucher = () => {
                 <Card className="p-8 text-center">
                   <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No active vouchers</p>
+                  <p className="text-sm text-muted-foreground mt-2">Redeem a voucher code to get started</p>
                 </Card>
               )}
             </TabsContent>
@@ -250,6 +310,20 @@ const Voucher = () => {
       </main>
 
       <MobileBottomNav />
+
+      {/* QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScan={handleScanResult}
+      />
+
+      {/* Create Voucher Modal */}
+      <CreateVoucherModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => refetchVouchers()}
+      />
     </div>
   );
 };
