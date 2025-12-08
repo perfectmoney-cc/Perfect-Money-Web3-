@@ -5,8 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
+import { TradingViewTicker } from "@/components/TradingViewTicker";
+import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2 } from "lucide-react";
+import { Footer } from "@/components/Footer";
+import { WalletCard } from "@/components/WalletCard";
+import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
 import { voucherABI } from "@/contracts/voucherABI";
@@ -14,7 +19,6 @@ import { CONTRACT_ADDRESSES, ChainId } from "@/contracts/addresses";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { CreateVoucherModal } from "@/components/CreateVoucherModal";
 import { bsc } from "wagmi/chains";
-import { formatEther } from "viem";
 
 interface VoucherItem {
   id: string;
@@ -35,7 +39,6 @@ const Voucher = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   const currentChainId = (chainId === 56 || chainId === 97 ? chainId : 56) as ChainId;
   const voucherAddress = CONTRACT_ADDRESSES[currentChainId]?.PMVoucher || "0x0000000000000000000000000000000000000000";
@@ -45,7 +48,6 @@ const Voucher = () => {
     hash: redeemTxHash,
   });
 
-  // Fetch user vouchers
   const { data: userVoucherIds, refetch: refetchVouchers } = useReadContract({
     address: voucherAddress as `0x${string}`,
     abi: voucherABI,
@@ -53,7 +55,6 @@ const Voucher = () => {
     args: address ? [address] : undefined,
   });
 
-  // Check if user is approved merchant
   const { data: isMerchant } = useReadContract({
     address: voucherAddress as `0x${string}`,
     abi: voucherABI,
@@ -61,7 +62,6 @@ const Voucher = () => {
     args: address ? [address] : undefined,
   });
 
-  // Check if user is owner
   const { data: contractOwner } = useReadContract({
     address: voucherAddress as `0x${string}`,
     abi: voucherABI,
@@ -118,17 +118,6 @@ const Voucher = () => {
     toast.success(`QR Code scanned: ${code}`);
   };
 
-  const getStatusIcon = (status: VoucherItem["status"]) => {
-    switch (status) {
-      case "active":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "used":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case "expired":
-        return <XCircle className="h-4 w-4 text-red-500" />;
-    }
-  };
-
   const getStatusBadge = (status: VoucherItem["status"]) => {
     switch (status) {
       case "active":
@@ -179,35 +168,36 @@ const Voucher = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-20 lg:pb-0">
+    <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
       <Header />
+      <TradingViewTicker />
+      <HeroBanner title="My Vouchers" subtitle="Manage and redeem your PM vouchers" />
 
-      <main className="container mx-auto px-4 pt-24 pb-12">
+      <main className="container mx-auto px-4 pt-12 pb-12 flex-1">
+        {/* Mobile Wallet Card */}
+        <div className="md:hidden mb-6">
+          <WalletCard showQuickFunctionsToggle={false} compact={true} />
+        </div>
+
+        <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Link>
+
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Page Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-primary/10">
-                <Ticket className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">My Vouchers</h1>
-                <p className="text-muted-foreground text-sm">Manage and redeem your PM vouchers</p>
-              </div>
-            </div>
-            {canCreateVouchers && (
-              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Voucher
-              </Button>
-            )}
-          </div>
-
           {/* Redeem Voucher Section */}
           <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/30">
-            <div className="flex items-center gap-3 mb-4">
-              <Plus className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold">Redeem Voucher</h2>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Plus className="h-5 w-5 text-primary" />
+                <h2 className="font-semibold">Redeem Voucher</h2>
+              </div>
+              {canCreateVouchers && (
+                <Button onClick={() => setShowCreateModal(true)} size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create Voucher
+                </Button>
+              )}
             </div>
             <div className="flex gap-3">
               <Input
@@ -309,16 +299,15 @@ const Voucher = () => {
         </div>
       </main>
 
+      <Footer />
       <MobileBottomNav />
 
-      {/* QR Scanner Modal */}
       <QRScannerModal
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
         onScan={handleScanResult}
       />
 
-      {/* Create Voucher Modal */}
       <CreateVoucherModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
