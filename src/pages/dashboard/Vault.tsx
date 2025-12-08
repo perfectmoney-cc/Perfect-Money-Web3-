@@ -935,6 +935,25 @@ const Vault = () => {
 
       <Footer />
       <MobileBottomNav />
+
+      {/* Early Withdrawal Modal */}
+      {selectedStakeForWithdrawal !== null && userStakes[selectedStakeForWithdrawal] && (
+        <EarlyWithdrawalModal
+          isOpen={showEarlyWithdrawal}
+          onClose={() => {
+            setShowEarlyWithdrawal(false);
+            setSelectedStakeForWithdrawal(null);
+          }}
+          stake={{
+            amount: userStakes[selectedStakeForWithdrawal].amount,
+            token: userStakes[selectedStakeForWithdrawal].token,
+            planName: STAKING_PLANS.find(p => p.id === userStakes[selectedStakeForWithdrawal].planId)?.name || "",
+            endTime: userStakes[selectedStakeForWithdrawal].endTime,
+            pendingProfit: calculatePendingProfit(userStakes[selectedStakeForWithdrawal]),
+          }}
+          onConfirm={confirmEarlyWithdrawal}
+        />
+      )}
     </div>
   );
 };
