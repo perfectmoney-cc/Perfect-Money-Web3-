@@ -10,7 +10,7 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { Footer } from "@/components/Footer";
 import { WalletCard } from "@/components/WalletCard";
-import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2, ArrowLeft } from "lucide-react";
+import { Ticket, Gift, Clock, CheckCircle, XCircle, Search, Plus, QrCode, Scan, Loader2, ArrowLeft, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
@@ -69,6 +69,7 @@ const Voucher = () => {
   });
 
   const canCreateVouchers = isMerchant || (address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase());
+  const isOwner = address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase();
 
   useEffect(() => {
     if (redeemSuccess) {
@@ -179,10 +180,20 @@ const Voucher = () => {
           <WalletCard showQuickFunctionsToggle={false} compact={true} />
         </div>
 
-        <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 text-sm">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-sm">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+          {isOwner && (
+            <Link to="/dashboard/voucher/admin">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Admin Panel
+              </Button>
+            </Link>
+          )}
+        </div>
 
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Redeem Voucher Section */}

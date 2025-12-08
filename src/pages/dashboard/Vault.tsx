@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { TradingViewTicker } from "@/components/TradingViewTicker";
 import { HeroBanner } from "@/components/HeroBanner";
@@ -17,17 +16,19 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { useAccount, useBalance } from "wagmi";
+import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { formatEther, parseEther } from "viem";
+import { CONTRACT_ADDRESSES, PM_TOKEN_ADDRESS } from "@/contracts/addresses";
 import usdtLogo from "@/assets/usdt-logo.png";
 import usdcLogo from "@/assets/usdc-logo.png";
 
 interface StakingPlan {
-  id: string;
+  id: number;
   name: string;
   tier: "bronze" | "silver" | "gold";
   minAmount: number;
   maxAmount: number;
-  apy: number;
+  monthlyRate: number;
   lockPeriod: number;
   minPmHold: number;
   maxPoolSize: number;
@@ -37,23 +38,23 @@ interface StakingPlan {
 }
 
 interface UserStake {
-  planId: string;
+  planId: number;
   amount: number;
   token: "USDT" | "USDC";
-  startDate: Date;
-  endDate: Date;
+  startTime: number;
+  endTime: number;
   claimedProfit: number;
-  pendingProfit: number;
+  isActive: boolean;
 }
 
 const STAKING_PLANS: StakingPlan[] = [
   {
-    id: "bronze",
+    id: 0,
     name: "Bronze",
     tier: "bronze",
     minAmount: 10,
     maxAmount: 1000,
-    apy: 5,
+    monthlyRate: 5,
     lockPeriod: 90,
     minPmHold: 100000,
     maxPoolSize: 300000,
@@ -62,12 +63,12 @@ const STAKING_PLANS: StakingPlan[] = [
     gradient: "from-amber-500/20 to-amber-700/20",
   },
   {
-    id: "silver",
+    id: 1,
     name: "Silver",
     tier: "silver",
     minAmount: 1001,
     maxAmount: 10000,
-    apy: 6,
+    monthlyRate: 6,
     lockPeriod: 90,
     minPmHold: 300000,
     maxPoolSize: 500000,
@@ -76,12 +77,12 @@ const STAKING_PLANS: StakingPlan[] = [
     gradient: "from-gray-400/20 to-gray-600/20",
   },
   {
-    id: "gold",
+    id: 2,
     name: "Gold",
     tier: "gold",
     minAmount: 10001,
     maxAmount: 25000,
-    apy: 8,
+    monthlyRate: 8,
     lockPeriod: 90,
     minPmHold: 500000,
     maxPoolSize: 1000000,
@@ -98,7 +99,37 @@ const Vault = () => {
   const [selectedToken, setSelectedToken] = useState<"USDT" | "USDC">("USDT");
   const [isStaking, setIsStaking] = useState(false);
   const [userStakes, setUserStakes] = useState<UserStake[]>([]);
-  const [pmBalance, setPmBalance] = useState(150000); // Mock PM balance
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Get PM token balance
+  const { data: pmTokenBalance } = useBalance({
+    address: address,
+    token: PM_TOKEN_ADDRESS as `0x${string}`,
+    chainId: 56,
+  });
+
+  const pmBalance = pmTokenBalance ? parseFloat(pmTokenBalance.formatted) : 0;
+
+  // Real-time profit calculation - update every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate pending profit in real-time
+  const calculatePendingProfit = useCallback((stake: UserStake) => {
+    const plan = STAKING_PLANS.find(p => p.id === stake.planId);
+    if (!plan || !stake.isActive) return 0;
+
+    const now = currentTime / 1000;
+    const elapsed = now - stake.startTime;
+    const dailyRate = plan.monthlyRate / 30 / 100;
+    const daysElapsed = elapsed / (24 * 60 * 60);
+    
+    return (stake.amount * dailyRate * daysElapsed) - stake.claimedProfit;
+  }, [currentTime]);
 
   // Calculate pool fill percentage
   const getPoolPercentage = (plan: StakingPlan) => {
@@ -113,8 +144,8 @@ const Vault = () => {
     return pmBalance >= plan.minPmHold;
   };
 
-  const getDailyProfit = (amount: number, apy: number) => {
-    return (amount * (apy / 100)) / 365;
+  const getDailyProfit = (amount: number, monthlyRate: number) => {
+    return (amount * (monthlyRate / 100)) / 30;
   };
 
   const handleStake = async () => {
@@ -143,17 +174,18 @@ const Vault = () => {
     setIsStaking(true);
     
     try {
-      // Simulate staking transaction
+      // Simulate staking transaction (will be replaced with real contract call)
       await new Promise(resolve => setTimeout(resolve, 2000));
       
+      const now = Date.now() / 1000;
       const newStake: UserStake = {
         planId: selectedPlan.id,
         amount: amount,
         token: selectedToken,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + selectedPlan.lockPeriod * 24 * 60 * 60 * 1000),
+        startTime: now,
+        endTime: now + (selectedPlan.lockPeriod * 24 * 60 * 60),
         claimedProfit: 0,
-        pendingProfit: 0,
+        isActive: true,
       };
       
       setUserStakes([...userStakes, newStake]);
@@ -168,19 +200,45 @@ const Vault = () => {
 
   const handleClaimProfit = (stakeIndex: number) => {
     const stake = userStakes[stakeIndex];
-    if (stake.pendingProfit < 10) {
+    const pendingProfit = calculatePendingProfit(stake);
+    
+    if (pendingProfit < 10) {
       toast.error("Minimum claim amount is 10 USDT/USDC");
       return;
     }
     
-    const afterTax = stake.pendingProfit * 0.95; // 5% withdrawal tax
-    toast.success(`Claimed ${afterTax.toFixed(2)} ${stake.token} (after 5% tax)`);
+    const afterTax = pendingProfit * 0.95; // 5% withdrawal tax
+    toast.success(`Claimed $${afterTax.toFixed(2)} ${stake.token} (after 5% tax)`);
     
     const updatedStakes = [...userStakes];
     updatedStakes[stakeIndex] = {
       ...stake,
-      claimedProfit: stake.claimedProfit + stake.pendingProfit,
-      pendingProfit: 0,
+      claimedProfit: stake.claimedProfit + pendingProfit,
+    };
+    setUserStakes(updatedStakes);
+  };
+
+  const handleWithdrawCapital = (stakeIndex: number) => {
+    const stake = userStakes[stakeIndex];
+    const now = currentTime / 1000;
+    
+    if (now < stake.endTime) {
+      toast.error("Capital is still locked");
+      return;
+    }
+
+    const pendingProfit = calculatePendingProfit(stake);
+    if (pendingProfit >= 10) {
+      toast.error("Please claim your pending profit first");
+      return;
+    }
+    
+    toast.success(`Withdrew ${stake.amount} ${stake.token} capital`);
+    
+    const updatedStakes = [...userStakes];
+    updatedStakes[stakeIndex] = {
+      ...stake,
+      isActive: false,
     };
     setUserStakes(updatedStakes);
   };
@@ -196,6 +254,22 @@ const Vault = () => {
       default:
         return <Coins className="h-6 w-6" />;
     }
+  };
+
+  const formatTimeRemaining = (endTime: number) => {
+    const now = currentTime / 1000;
+    const remaining = endTime - now;
+    
+    if (remaining <= 0) return "Unlocked";
+    
+    const days = Math.floor(remaining / (24 * 60 * 60));
+    const hours = Math.floor((remaining % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((remaining % (60 * 60)) / 60);
+    const seconds = Math.floor(remaining % 60);
+    
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    return `${minutes}m ${seconds}s`;
   };
 
   return (
@@ -225,7 +299,7 @@ const Vault = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Your PM Token Balance</p>
-                  <p className="text-xl font-bold">{pmBalance.toLocaleString()} PM</p>
+                  <p className="text-xl font-bold">{pmBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} PM</p>
                 </div>
               </div>
               <Badge variant="outline" className="text-xs">
@@ -268,8 +342,8 @@ const Vault = () => {
 
                     <div className="space-y-3">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground text-sm">APY</span>
-                        <span className="font-bold text-lg text-green-500">{plan.apy}% Monthly</span>
+                        <span className="text-muted-foreground text-sm">Monthly Rate</span>
+                        <span className="font-bold text-lg text-green-500">{plan.monthlyRate}%</span>
                       </div>
                       
                       <div className="flex justify-between">
@@ -382,19 +456,19 @@ const Vault = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Daily Profit</span>
                       <span className="font-semibold text-green-500">
-                        +${getDailyProfit(parseFloat(stakeAmount), selectedPlan.apy).toFixed(4)}
+                        +${getDailyProfit(parseFloat(stakeAmount), selectedPlan.monthlyRate).toFixed(4)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Monthly Profit</span>
                       <span className="font-semibold text-green-500">
-                        +${(getDailyProfit(parseFloat(stakeAmount), selectedPlan.apy) * 30).toFixed(2)}
+                        +${(parseFloat(stakeAmount) * selectedPlan.monthlyRate / 100).toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total ({selectedPlan.lockPeriod} days)</span>
                       <span className="font-bold text-green-500">
-                        +${(getDailyProfit(parseFloat(stakeAmount), selectedPlan.apy) * selectedPlan.lockPeriod).toFixed(2)}
+                        +${(getDailyProfit(parseFloat(stakeAmount), selectedPlan.monthlyRate) * selectedPlan.lockPeriod).toFixed(2)}
                       </span>
                     </div>
                   </>
@@ -418,34 +492,38 @@ const Vault = () => {
             </div>
           </Card>
 
-          {/* User Stakes */}
-          {userStakes.length > 0 && (
+          {/* User Stakes with Real-time Profit */}
+          {userStakes.filter(s => s.isActive).length > 0 && (
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <VaultIcon className="h-5 w-5 text-primary" />
                 Your Active Stakes
+                <Badge variant="outline" className="ml-2 animate-pulse">
+                  Live Updates
+                </Badge>
               </h3>
 
               <div className="space-y-4">
-                {userStakes.map((stake, index) => {
+                {userStakes.filter(s => s.isActive).map((stake, index) => {
                   const plan = STAKING_PLANS.find(p => p.id === stake.planId);
-                  const daysRemaining = Math.ceil((stake.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                  const isUnlocked = daysRemaining <= 0;
+                  const pendingProfit = calculatePendingProfit(stake);
+                  const now = currentTime / 1000;
+                  const isUnlocked = now >= stake.endTime;
                   
                   return (
                     <div key={index} className="p-4 rounded-lg bg-muted/30 border border-border">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <Badge className={plan?.gradient}>{plan?.name}</Badge>
+                          <Badge className={`bg-gradient-to-r ${plan?.gradient}`}>{plan?.name}</Badge>
                           <span className="font-semibold">{stake.amount} {stake.token}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isUnlocked ? (
                             <Badge className="bg-green-500/20 text-green-500">Unlocked</Badge>
                           ) : (
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="font-mono">
                               <Lock className="h-3 w-3 mr-1" />
-                              {daysRemaining} days left
+                              {formatTimeRemaining(stake.endTime)}
                             </Badge>
                           )}
                         </div>
@@ -454,11 +532,11 @@ const Vault = () => {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Started</p>
-                          <p className="font-medium">{stake.startDate.toLocaleDateString()}</p>
+                          <p className="font-medium">{new Date(stake.startTime * 1000).toLocaleDateString()}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Unlock Date</p>
-                          <p className="font-medium">{stake.endDate.toLocaleDateString()}</p>
+                          <p className="font-medium">{new Date(stake.endTime * 1000).toLocaleDateString()}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Claimed Profit</p>
@@ -466,21 +544,28 @@ const Vault = () => {
                         </div>
                         <div>
                           <p className="text-muted-foreground">Pending Profit</p>
-                          <p className="font-medium text-yellow-500">${stake.pendingProfit.toFixed(2)}</p>
+                          <p className="font-bold text-yellow-500 animate-pulse">
+                            ${pendingProfit.toFixed(6)}
+                          </p>
                         </div>
                       </div>
 
                       <div className="flex gap-3 mt-4">
                         <Button
                           size="sm"
-                          onClick={() => handleClaimProfit(index)}
-                          disabled={stake.pendingProfit < 10}
+                          onClick={() => handleClaimProfit(userStakes.indexOf(stake))}
+                          disabled={pendingProfit < 10}
                           className="flex-1"
                         >
-                          Claim Profit
+                          {pendingProfit < 10 ? `Min $10 to claim` : `Claim $${(pendingProfit * 0.95).toFixed(2)}`}
                         </Button>
                         {isUnlocked && (
-                          <Button size="sm" variant="outline" className="flex-1">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => handleWithdrawCapital(userStakes.indexOf(stake))}
+                          >
                             Withdraw Capital
                           </Button>
                         )}
