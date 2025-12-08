@@ -190,9 +190,9 @@ export const WalletCard = ({
     color: "text-primary",
     bg: "bg-primary/10"
   }, {
-    to: "/dashboard/merchant",
+    to: "/dashboard/store",
     icon: Store,
-    label: "Merchant",
+    label: "Store",
     color: "text-orange-500",
     bg: "bg-orange-500/10"
   }, {

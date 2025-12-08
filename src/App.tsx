@@ -64,6 +64,7 @@ import PresaleTerms from "./pages/PresaleTerms";
 import LegalCompliance from "./pages/LegalCompliance";
 import BrandAssets from "./pages/BrandAssets";
 import Downloads from "./pages/Downloads";
+import StorePage from "./pages/dashboard/Store";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -124,6 +125,7 @@ const App = () => (
               <Route path="/dashboard/merchant/recurring" element={<MerchantRecurring />} />
               <Route path="/dashboard/merchant/analytics" element={<MerchantAnalytics />} />
               <Route path="/dashboard/merchant/promotions" element={<MerchantPromotion />} />
+              <Route path="/dashboard/store" element={<StorePage />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/tokenomics" element={<Tokenomics />} />
               <Route path="/whitepaper" element={<Whitepaper />} />

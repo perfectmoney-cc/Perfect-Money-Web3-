@@ -7,6 +7,8 @@
   "background_color": "#000000",
   "theme_color": "#dc2626",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "id": "/",
   "icons": [
     {
       "src": "/pm-icon-512.png",
@@ -26,6 +28,26 @@
       "type": "image/png"
     },
     {
+      "src": "/pm-icon-512.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/pm-icon-512.png",
+      "sizes": "167x167",
+      "type": "image/png"
+    },
+    {
+      "src": "/pm-icon-512.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/pm-icon-512.png",
+      "sizes": "120x120",
+      "type": "image/png"
+    },
+    {
       "src": "/favicon.png",
       "sizes": "64x64",
       "type": "image/png"
@@ -33,5 +55,8 @@
   ],
   "categories": ["finance", "utilities"],
   "screenshots": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "lang": "en-US",
+  "dir": "ltr"
 }
