@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,12 +36,18 @@ import {
   Zap,
   Trophy,
   Heart,
-  Clock
+  Clock,
+  History,
+  ExternalLink
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
+import { parseUnits, formatUnits } from "viem";
 import confetti from "canvas-confetti";
+import { PM_TOKEN_ADDRESS } from "@/contracts/addresses";
+import { PMTokenABI } from "@/contracts/abis";
+import { useOrderHistory } from "@/hooks/useOrderHistory";
 
 interface Product {
   id: number;
@@ -65,6 +71,9 @@ interface CartItem extends Product {
   selectedColor?: string;
 }
 
+// Store wallet address for payments
+const STORE_WALLET_ADDRESS = "0x2a09e2f78032e9e0e4b1a0da4e787c0e7a11b8c3";
+
 const StorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -75,11 +84,65 @@ const StorePage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null);
   const [orderNumber, setOrderNumber] = useState("");
+  const [txHash, setTxHash] = useState("");
   
   const { address, isConnected } = useAccount();
+  const { addOrder } = useOrderHistory();
+
+  // Read PM token balance
+  const { data: pmBalance } = useReadContract({
+    address: PM_TOKEN_ADDRESS as `0x${string}`,
+    abi: PMTokenABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+  });
+
+  // Read allowance for store wallet
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: PM_TOKEN_ADDRESS as `0x${string}`,
+    abi: PMTokenABI,
+    functionName: 'allowance',
+    args: address ? [address, STORE_WALLET_ADDRESS as `0x${string}`] : undefined,
+  });
+
+  // Approve PM tokens
+  const { writeContract: approveTokens, data: approveHash, isPending: isApprovePending } = useWriteContract();
+
+  // Transfer PM tokens
+  const { writeContract: transferTokens, data: transferHash, isPending: isTransferPending } = useWriteContract();
+
+  // Wait for approve transaction
+  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+    hash: approveHash,
+  });
+
+  // Wait for transfer transaction
+  const { isLoading: isTransferConfirming, isSuccess: isTransferSuccess } = useWaitForTransactionReceipt({
+    hash: transferHash,
+  });
+
+  // Handle successful approval
+  useEffect(() => {
+    if (isApproveSuccess) {
+      setIsApproving(false);
+      refetchAllowance();
+      toast.success("PM tokens approved! Proceeding with payment...");
+      executePayment();
+    }
+  }, [isApproveSuccess]);
+
+  // Handle successful transfer
+  useEffect(() => {
+    if (isTransferSuccess && transferHash) {
+      completeOrder(transferHash);
+    }
+  }, [isTransferSuccess, transferHash]);
+
+  const formattedBalance = pmBalance ? Number(formatUnits(pmBalance as bigint, 18)).toFixed(2) : "0";
 
   const [shippingInfo, setShippingInfo] = useState({
     fullName: "",
@@ -347,38 +410,60 @@ const StorePage = () => {
     }
   };
 
-  const handleCheckout = async () => {
-    if (!isConnected) {
-      toast.error("Please connect your wallet to checkout");
-      return;
-    }
+  const executePayment = () => {
+    const totalAmount = getTotal();
+    const amountInWei = parseUnits(totalAmount.toString(), 18);
 
-    if (!shippingInfo.fullName || !shippingInfo.email || !shippingInfo.address || !shippingInfo.city || !shippingInfo.country) {
-      toast.error("Please fill in all required shipping details");
-      return;
+    try {
+      transferTokens({
+        address: PM_TOKEN_ADDRESS as `0x${string}`,
+        abi: PMTokenABI,
+        functionName: 'transfer',
+        args: [STORE_WALLET_ADDRESS as `0x${string}`, amountInWei],
+      } as any);
+    } catch (error) {
+      console.error("Transfer error:", error);
+      toast.error("Payment failed. Please try again.");
+      setIsProcessing(false);
     }
+  };
 
-    setIsProcessing(true);
-    
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+  const completeOrder = (hash: string) => {
     const newOrderNumber = `PM${Date.now().toString().slice(-8)}`;
     setOrderNumber(newOrderNumber);
+    setTxHash(hash);
+
+    // Save order to history
+    addOrder({
+      orderNumber: newOrderNumber,
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+        image: item.image
+      })),
+      subtotal: getSubtotal(),
+      discount: getDiscount(),
+      total: getTotal(),
+      voucherCode: appliedVoucher?.code,
+      shippingInfo,
+      status: 'confirmed',
+      txHash: hash
+    });
     
-    // Show success
     setIsProcessing(false);
     setShowCheckoutModal(false);
     setShowSuccessModal(true);
     
-    // Confetti animation
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 }
     });
     
-    // Clear cart
     setCart([]);
     setAppliedVoucher(null);
     setVoucherCode("");
@@ -392,6 +477,52 @@ const StorePage = () => {
       zipCode: "",
       country: ""
     });
+  };
+
+  const handleCheckout = async () => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet to checkout");
+      return;
+    }
+
+    if (!shippingInfo.fullName || !shippingInfo.email || !shippingInfo.address || !shippingInfo.city || !shippingInfo.country) {
+      toast.error("Please fill in all required shipping details");
+      return;
+    }
+
+    const totalAmount = getTotal();
+    const amountInWei = parseUnits(totalAmount.toString(), 18);
+    const currentBalance = pmBalance ? (pmBalance as bigint) : BigInt(0);
+
+    if (currentBalance < amountInWei) {
+      toast.error(`Insufficient PM balance. You need ${totalAmount} PM tokens.`);
+      return;
+    }
+
+    setIsProcessing(true);
+
+    const currentAllowance = allowance ? (allowance as bigint) : BigInt(0);
+
+    if (currentAllowance < amountInWei) {
+      setIsApproving(true);
+      toast.info("Approving PM tokens for payment...");
+      
+      try {
+        approveTokens({
+          address: PM_TOKEN_ADDRESS as `0x${string}`,
+          abi: PMTokenABI,
+          functionName: 'approve',
+          args: [STORE_WALLET_ADDRESS as `0x${string}`, amountInWei],
+        } as any);
+      } catch (error) {
+        console.error("Approval error:", error);
+        toast.error("Token approval failed. Please try again.");
+        setIsProcessing(false);
+        setIsApproving(false);
+      }
+    } else {
+      executePayment();
+    }
   };
 
   return (
@@ -414,19 +545,27 @@ const StorePage = () => {
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
-          <Button 
-            variant="outline" 
-            className="relative"
-            onClick={() => setShowCartModal(true)}
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Cart
-            {cart.length > 0 && (
-              <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
-                {cart.reduce((sum, item) => sum + item.quantity, 0)}
-              </Badge>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link to="/dashboard/store/orders">
+              <Button variant="outline" size="sm">
+                <History className="h-4 w-4 mr-2" />
+                Orders
+              </Button>
+            </Link>
+            <Button 
+              variant="outline" 
+              className="relative"
+              onClick={() => setShowCartModal(true)}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Cart
+              {cart.length > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                </Badge>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="max-w-7xl mx-auto">
@@ -953,13 +1092,30 @@ const StorePage = () => {
             </div>
             <h2 className="text-2xl font-bold mb-2">Order Confirmed!</h2>
             <p className="text-muted-foreground mb-4">
-              Thank you for your purchase. Your order has been successfully placed.
+              Your payment has been processed on the blockchain.
             </p>
             
-            <Card className="p-4 bg-muted/30 mb-6">
+            <Card className="p-4 bg-muted/30 mb-4">
               <p className="text-sm text-muted-foreground">Order Number</p>
               <p className="text-xl font-bold font-mono text-primary">{orderNumber}</p>
             </Card>
+
+            {txHash && (
+              <Card className="p-3 bg-muted/30 mb-4">
+                <p className="text-xs text-muted-foreground mb-1">Transaction Hash</p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-xs font-mono truncate max-w-[200px]">{txHash}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={() => window.open(`https://bscscan.com/tx/${txHash}`, '_blank')}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                </div>
+              </Card>
+            )}
             
             <div className="space-y-2 text-sm text-muted-foreground">
               <p className="flex items-center justify-center gap-2">
@@ -970,7 +1126,13 @@ const StorePage = () => {
             </div>
           </div>
           
-          <DialogFooter className="justify-center">
+          <DialogFooter className="flex-col sm:flex-row gap-2 justify-center">
+            <Link to="/dashboard/store/orders">
+              <Button variant="outline">
+                <History className="h-4 w-4 mr-2" />
+                View Orders
+              </Button>
+            </Link>
             <Button onClick={() => setShowSuccessModal(false)} className="bg-primary">
               Continue Shopping
             </Button>
