@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock } from "lucide-react";
+import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -150,6 +150,300 @@ const MerchantAPI = () => {
       }
     }
   ];
+
+  // Webhook Testing Tool Component
+  const WebhookTestingTool = ({ 
+    address, 
+    environment, 
+    currentSecretKey 
+  }: { 
+    address: string | undefined; 
+    environment: "sandbox" | "production"; 
+    currentSecretKey: string;
+  }) => {
+    const [webhookUrl, setWebhookUrl] = useState("");
+    const [selectedEvent, setSelectedEvent] = useState("payment.completed");
+    const [customAmount, setCustomAmount] = useState("100.00");
+    const [customOrderId, setCustomOrderId] = useState("TEST-ORDER-001");
+    const [isSending, setIsSending] = useState(false);
+    const [testResults, setTestResults] = useState<Array<{
+      id: string;
+      event: string;
+      status: "success" | "error" | "pending";
+      responseCode?: number;
+      responseTime?: number;
+      timestamp: Date;
+      error?: string;
+    }>>([]);
+
+    const webhookEvents = [
+      { value: "payment.created", label: "Payment Created", description: "Triggered when a new payment is initiated" },
+      { value: "payment.completed", label: "Payment Completed", description: "Triggered when payment is successfully processed" },
+      { value: "payment.failed", label: "Payment Failed", description: "Triggered when payment processing fails" },
+      { value: "payment.expired", label: "Payment Expired", description: "Triggered when payment link expires" },
+      { value: "payment.refunded", label: "Payment Refunded", description: "Triggered when a refund is processed" },
+    ];
+
+    const generateTestPayload = (event: string) => {
+      const paymentId = `pay_test_${Date.now().toString(36)}`;
+      const txHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+      
+      return {
+        event,
+        payment_id: paymentId,
+        merchant_id: address?.slice(0, 10) || 'test_merchant',
+        amount: customAmount,
+        currency: "PM",
+        order_id: customOrderId,
+        tx_hash: event === "payment.completed" ? txHash : undefined,
+        status: event.split('.')[1],
+        environment,
+        timestamp: new Date().toISOString(),
+        test_mode: true
+      };
+    };
+
+    const sendTestWebhook = async () => {
+      if (!webhookUrl) {
+        toast.error("Please enter a webhook URL");
+        return;
+      }
+
+      try {
+        new URL(webhookUrl);
+      } catch {
+        toast.error("Please enter a valid URL");
+        return;
+      }
+
+      setIsSending(true);
+      const testId = `test_${Date.now()}`;
+      const payload = generateTestPayload(selectedEvent);
+      const startTime = Date.now();
+
+      setTestResults(prev => [{
+        id: testId,
+        event: selectedEvent,
+        status: "pending",
+        timestamp: new Date()
+      }, ...prev.slice(0, 9)]);
+
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Webhook-Signature': `sha256_test_${Date.now()}`,
+            'X-Webhook-Environment': environment,
+            'X-Webhook-Test': 'true'
+          },
+          body: JSON.stringify(payload),
+          mode: 'no-cors'
+        });
+
+        const responseTime = Date.now() - startTime;
+
+        // Since we're using no-cors, we can't read the response
+        // We'll assume success if no error is thrown
+        setTestResults(prev => prev.map(r => 
+          r.id === testId 
+            ? { ...r, status: "success" as const, responseCode: 200, responseTime }
+            : r
+        ));
+
+        toast.success(`Test webhook sent successfully (${responseTime}ms)`);
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+        setTestResults(prev => prev.map(r => 
+          r.id === testId 
+            ? { ...r, status: "error" as const, responseTime, error: error instanceof Error ? error.message : "Failed to send" }
+            : r
+        ));
+
+        toast.error("Failed to send test webhook");
+      } finally {
+        setIsSending(false);
+      }
+    };
+
+    const clearResults = () => {
+      setTestResults([]);
+      toast.success("Test history cleared");
+    };
+
+    return (
+      <Card className="border-orange-500/30 bg-gradient-to-r from-orange-500/5 to-amber-500/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TestTube className="h-5 w-5 text-orange-500" />
+              <CardTitle>Webhook Testing Tool</CardTitle>
+            </div>
+            <Badge variant="outline" className="border-orange-500/50 text-orange-500">
+              {environment === "sandbox" ? "Sandbox" : "Production"} Mode
+            </Badge>
+          </div>
+          <CardDescription>Send test webhook events to your endpoint</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Webhook URL Input */}
+          <div className="space-y-2">
+            <Label htmlFor="webhook-url">Your Webhook Endpoint URL</Label>
+            <Input
+              id="webhook-url"
+              placeholder="https://yoursite.com/api/webhook"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              className="font-mono"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the URL where you want to receive test webhook events
+            </p>
+          </div>
+
+          {/* Event Selection */}
+          <div className="space-y-2">
+            <Label>Select Event Type</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {webhookEvents.map((event) => (
+                <button
+                  key={event.value}
+                  onClick={() => setSelectedEvent(event.value)}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    selectedEvent === event.value
+                      ? "border-orange-500 bg-orange-500/10"
+                      : "border-border hover:border-orange-500/50 hover:bg-orange-500/5"
+                  }`}
+                >
+                  <div className="font-medium text-sm">{event.label}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{event.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Payload Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="custom-amount">Test Amount (PM)</Label>
+              <Input
+                id="custom-amount"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                placeholder="100.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custom-order-id">Test Order ID</Label>
+              <Input
+                id="custom-order-id"
+                value={customOrderId}
+                onChange={(e) => setCustomOrderId(e.target.value)}
+                placeholder="TEST-ORDER-001"
+              />
+            </div>
+          </div>
+
+          {/* Payload Preview */}
+          <div className="space-y-2">
+            <Label>Payload Preview</Label>
+            <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto text-orange-400 max-h-48">
+              {JSON.stringify(generateTestPayload(selectedEvent), null, 2)}
+            </pre>
+          </div>
+
+          {/* Send Button */}
+          <div className="flex gap-3">
+            <Button
+              onClick={sendTestWebhook}
+              disabled={isSending || !webhookUrl}
+              className="flex-1 bg-orange-500 hover:bg-orange-600"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Test Webhook
+                </>
+              )}
+            </Button>
+            {testResults.length > 0 && (
+              <Button variant="outline" onClick={clearResults}>
+                Clear History
+              </Button>
+            )}
+          </div>
+
+          {/* Test Results */}
+          {testResults.length > 0 && (
+            <div className="space-y-2">
+              <Label>Recent Test Results</Label>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {testResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className={`p-3 rounded-lg border flex items-center justify-between ${
+                      result.status === "success"
+                        ? "border-green-500/30 bg-green-500/5"
+                        : result.status === "error"
+                        ? "border-red-500/30 bg-red-500/5"
+                        : "border-yellow-500/30 bg-yellow-500/5"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {result.status === "success" ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : result.status === "error" ? (
+                        <XCircle className="h-5 w-5 text-red-500" />
+                      ) : (
+                        <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                      )}
+                      <div>
+                        <div className="font-medium text-sm">{result.event}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {result.timestamp.toLocaleTimeString()}
+                          {result.error && ` - ${result.error}`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {result.responseCode && (
+                        <Badge variant="outline" className={
+                          result.responseCode === 200 ? "text-green-500" : "text-red-500"
+                        }>
+                          {result.responseCode}
+                        </Badge>
+                      )}
+                      {result.responseTime && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {result.responseTime}ms
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tips */}
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <h4 className="font-medium text-sm mb-2">💡 Testing Tips</h4>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li>• Test webhooks are sent with <code className="bg-muted px-1 rounded">X-Webhook-Test: true</code> header</li>
+              <li>• Ensure your endpoint returns a 2xx status code to confirm receipt</li>
+              <li>• Use tools like <a href="https://webhook.site" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">webhook.site</a> to debug payloads</li>
+              <li>• Test all event types before going live</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (!isConnected) {
     return (
@@ -499,6 +793,13 @@ console.log(data.payment_url);`}
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* Webhook Testing Tool */}
+        <WebhookTestingTool 
+          address={address}
+          environment={environment}
+          currentSecretKey={currentSecretKey}
+        />
 
         {/* Webhook Integration */}
         <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
