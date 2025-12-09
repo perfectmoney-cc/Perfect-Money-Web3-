@@ -38,15 +38,17 @@ import {
   Heart,
   Clock,
   History,
-  ExternalLink
+  ExternalLink,
+  Coins
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { parseUnits, formatUnits, formatEther } from "viem";
 import confetti from "canvas-confetti";
-import { PM_TOKEN_ADDRESS } from "@/contracts/addresses";
+import { PM_TOKEN_ADDRESS, CONTRACT_ADDRESSES } from "@/contracts/addresses";
 import { PMTokenABI } from "@/contracts/abis";
+import { PMStoreABI } from "@/contracts/storeABI";
 import { useOrderHistory } from "@/hooks/useOrderHistory";
 
 interface Product {
@@ -58,6 +60,7 @@ interface Product {
   discount: number;
   image: string;
   rating: number;
+  totalRatings: number;
   sales: number;
   description: string;
   sizes?: string[];
@@ -74,6 +77,23 @@ interface CartItem extends Product {
 // Store wallet address for payments
 const STORE_WALLET_ADDRESS = "0x2a09e2f78032e9e0e4b1a0da4e787c0e7a11b8c3";
 
+const categoryMap: { [key: number]: string } = {
+  0: "apparel",
+  1: "accessories",
+  2: "collectibles",
+  3: "digital",
+  4: "limited"
+};
+
+const categoryImages: { [key: string]: string } = {
+  apparel: "👕",
+  accessories: "🎒",
+  collectibles: "🏆",
+  digital: "💎",
+  limited: "⭐",
+  merchandise: "📦"
+};
+
 const StorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -83,8 +103,12 @@ const StorePage = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingProductId, setRatingProductId] = useState<number | null>(null);
+  const [selectedRating, setSelectedRating] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isRating, setIsRating] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null);
   const [orderNumber, setOrderNumber] = useState("");
@@ -92,6 +116,32 @@ const StorePage = () => {
   
   const { address, isConnected } = useAccount();
   const { addOrder } = useOrderHistory();
+  
+  const storeAddress = CONTRACT_ADDRESSES[56]?.PMStore as `0x${string}` | undefined;
+
+  // Read blockchain products
+  const { data: blockchainProducts, refetch: refetchProducts } = useReadContract({
+    address: storeAddress,
+    abi: PMStoreABI,
+    functionName: "getActiveProducts",
+  });
+
+  // Read store stats
+  const { data: storeStats } = useReadContract({
+    address: storeAddress,
+    abi: PMStoreABI,
+    functionName: "getStoreStats",
+  });
+
+  // Read rating reward amount
+  const { data: ratingReward } = useReadContract({
+    address: storeAddress,
+    abi: PMStoreABI,
+    functionName: "ratingReward",
+  });
+
+  // Rate product contract call
+  const { writeContractAsync: rateProductAsync } = useWriteContract();
 
   // Read PM token balance
   const { data: pmBalance } = useReadContract({
@@ -163,175 +213,38 @@ const StorePage = () => {
     { id: "merchandise", name: "Merchandise", icon: Package },
   ];
 
-  const products: Product[] = [
-    {
-      id: 1,
-      name: "PM Logo T-Shirt",
-      category: "apparel",
-      price: 250,
-      originalPrice: 300,
-      discount: 17,
-      image: "👕",
-      rating: 4.9,
-      sales: 450,
-      description: "Premium cotton t-shirt with Perfect Money logo embroidered",
-      sizes: ["S", "M", "L", "XL", "XXL"],
-      colors: ["Black", "White", "Red"],
-      stock: 100
-    },
-    {
-      id: 2,
-      name: "PM Hoodie Premium",
-      category: "apparel",
-      price: 500,
-      originalPrice: 600,
-      discount: 17,
-      image: "🧥",
-      rating: 4.8,
-      sales: 320,
-      description: "Warm fleece hoodie with PM branding, perfect for crypto enthusiasts",
-      sizes: ["S", "M", "L", "XL", "XXL"],
-      colors: ["Black", "Navy", "Gray"],
-      stock: 75
-    },
-    {
-      id: 3,
-      name: "PM Baseball Cap",
-      category: "accessories",
-      price: 150,
-      originalPrice: 180,
-      discount: 17,
-      image: "🧢",
-      rating: 4.7,
-      sales: 890,
-      description: "Adjustable baseball cap with embroidered PM logo",
-      colors: ["Black", "White", "Red"],
-      stock: 200
-    },
-    {
-      id: 4,
-      name: "PM Crypto Mug",
-      category: "merchandise",
-      price: 100,
-      originalPrice: 120,
-      discount: 17,
-      image: "☕",
-      rating: 4.9,
-      sales: 1250,
-      description: "Ceramic mug with PM logo, perfect for your morning coffee",
-      colors: ["Black", "White"],
-      stock: 500
-    },
-    {
-      id: 5,
-      name: "PM Founder Badge (NFT)",
-      category: "collectibles",
-      price: 1000,
-      originalPrice: 1500,
-      discount: 33,
-      image: "🏆",
-      rating: 5.0,
-      sales: 50,
-      description: "Exclusive NFT badge for early supporters, limited to 100 pieces",
-      stock: 10
-    },
-    {
-      id: 6,
-      name: "PM Laptop Sticker Pack",
-      category: "accessories",
-      price: 50,
-      originalPrice: 60,
-      discount: 17,
-      image: "🎨",
-      rating: 4.6,
-      sales: 2100,
-      description: "Pack of 10 high-quality vinyl stickers with PM designs",
-      stock: 1000
-    },
-    {
-      id: 7,
-      name: "PM Backpack",
-      category: "accessories",
-      price: 400,
-      originalPrice: 480,
-      discount: 17,
-      image: "🎒",
-      rating: 4.8,
-      sales: 180,
-      description: "Premium laptop backpack with PM branding and USB charging port",
-      colors: ["Black", "Gray"],
-      stock: 50
-    },
-    {
-      id: 8,
-      name: "PM Polo Shirt",
-      category: "apparel",
-      price: 300,
-      originalPrice: 350,
-      discount: 14,
-      image: "👔",
-      rating: 4.7,
-      sales: 290,
-      description: "Business casual polo with subtle PM logo",
-      sizes: ["S", "M", "L", "XL", "XXL"],
-      colors: ["Black", "White", "Navy"],
-      stock: 120
-    },
-    {
-      id: 9,
-      name: "PM Phone Case",
-      category: "accessories",
-      price: 80,
-      originalPrice: 100,
-      discount: 20,
-      image: "📱",
-      rating: 4.5,
-      sales: 750,
-      description: "Durable phone case with PM design for iPhone & Android",
-      stock: 300
-    },
-    {
-      id: 10,
-      name: "PM Limited Edition Coin",
-      category: "collectibles",
-      price: 500,
-      originalPrice: 600,
-      discount: 17,
-      image: "🪙",
-      rating: 4.9,
-      sales: 100,
-      description: "Physical commemorative coin with certificate of authenticity",
-      stock: 25
-    },
-    {
-      id: 11,
-      name: "PM Lanyard & Card Holder",
-      category: "accessories",
-      price: 75,
-      originalPrice: 90,
-      discount: 17,
-      image: "🔖",
-      rating: 4.6,
-      sales: 560,
-      description: "Professional lanyard with ID card holder featuring PM branding",
-      colors: ["Black", "Red"],
-      stock: 400
-    },
-    {
-      id: 12,
-      name: "PM Water Bottle",
-      category: "merchandise",
-      price: 120,
-      originalPrice: 150,
-      discount: 20,
-      image: "🍶",
-      rating: 4.8,
-      sales: 680,
-      description: "Stainless steel insulated bottle with PM logo, 750ml",
-      colors: ["Black", "White", "Red"],
-      stock: 250
-    }
+  const mockProducts: Product[] = [
+    { id: 1, name: "PM Logo T-Shirt", category: "apparel", price: 250, originalPrice: 300, discount: 17, image: "👕", rating: 4.9, totalRatings: 45, sales: 450, description: "Premium cotton t-shirt with Perfect Money logo embroidered", sizes: ["S", "M", "L", "XL", "XXL"], colors: ["Black", "White", "Red"], stock: 100 },
+    { id: 2, name: "PM Hoodie Premium", category: "apparel", price: 500, originalPrice: 600, discount: 17, image: "🧥", rating: 4.8, totalRatings: 32, sales: 320, description: "Warm fleece hoodie with PM branding, perfect for crypto enthusiasts", sizes: ["S", "M", "L", "XL", "XXL"], colors: ["Black", "Navy", "Gray"], stock: 75 },
+    { id: 3, name: "PM Baseball Cap", category: "accessories", price: 150, originalPrice: 180, discount: 17, image: "🧢", rating: 4.7, totalRatings: 89, sales: 890, description: "Adjustable baseball cap with embroidered PM logo", colors: ["Black", "White", "Red"], stock: 200 },
+    { id: 4, name: "PM Crypto Mug", category: "merchandise", price: 100, originalPrice: 120, discount: 17, image: "☕", rating: 4.9, totalRatings: 125, sales: 1250, description: "Ceramic mug with PM logo, perfect for your morning coffee", colors: ["Black", "White"], stock: 500 },
+    { id: 5, name: "PM Founder Badge (NFT)", category: "collectibles", price: 1000, originalPrice: 1500, discount: 33, image: "🏆", rating: 5.0, totalRatings: 5, sales: 50, description: "Exclusive NFT badge for early supporters, limited to 100 pieces", stock: 10 },
+    { id: 6, name: "PM Laptop Sticker Pack", category: "accessories", price: 50, originalPrice: 60, discount: 17, image: "🎨", rating: 4.6, totalRatings: 210, sales: 2100, description: "Pack of 10 high-quality vinyl stickers with PM designs", stock: 1000 },
+    { id: 7, name: "PM Backpack", category: "accessories", price: 400, originalPrice: 480, discount: 17, image: "🎒", rating: 4.8, totalRatings: 18, sales: 180, description: "Premium laptop backpack with PM branding and USB charging port", colors: ["Black", "Gray"], stock: 50 },
+    { id: 8, name: "PM Polo Shirt", category: "apparel", price: 300, originalPrice: 350, discount: 14, image: "👔", rating: 4.7, totalRatings: 29, sales: 290, description: "Business casual polo with subtle PM logo", sizes: ["S", "M", "L", "XL", "XXL"], colors: ["Black", "White", "Navy"], stock: 120 },
+    { id: 9, name: "PM Phone Case", category: "accessories", price: 80, originalPrice: 100, discount: 20, image: "📱", rating: 4.5, totalRatings: 75, sales: 750, description: "Durable phone case with PM design for iPhone & Android", stock: 300 },
+    { id: 10, name: "PM Limited Edition Coin", category: "collectibles", price: 500, originalPrice: 600, discount: 17, image: "🪙", rating: 4.9, totalRatings: 10, sales: 100, description: "Physical commemorative coin with certificate of authenticity", stock: 25 },
+    { id: 11, name: "PM Lanyard & Card Holder", category: "accessories", price: 75, originalPrice: 90, discount: 17, image: "🔖", rating: 4.6, totalRatings: 56, sales: 560, description: "Professional lanyard with ID card holder featuring PM branding", colors: ["Black", "Red"], stock: 400 },
+    { id: 12, name: "PM Water Bottle", category: "merchandise", price: 120, originalPrice: 150, discount: 20, image: "🍶", rating: 4.8, totalRatings: 68, sales: 680, description: "Stainless steel insulated bottle with PM logo, 750ml", colors: ["Black", "White", "Red"], stock: 250 }
   ];
+
+  // Transform blockchain products or use fallback mock products
+  const products: Product[] = blockchainProducts && (blockchainProducts as any[]).length > 0
+    ? (blockchainProducts as any[]).map((p: any) => ({
+        id: Number(p.id),
+        name: p.name,
+        category: categoryMap[p.category] || "merchandise",
+        price: Number(formatEther(p.price)),
+        originalPrice: Number(formatEther(p.price)) * 1.2,
+        discount: 17,
+        image: categoryImages[categoryMap[p.category]] || "📦",
+        rating: p.totalRatings > 0 ? Number(p.ratingSum) / Number(p.totalRatings) : 0,
+        totalRatings: Number(p.totalRatings),
+        sales: Number(p.totalSold),
+        description: p.description,
+        stock: Number(p.stock),
+      }))
+    : mockProducts;
 
   const vouchers = [
     { code: "PM10OFF", discount: 10 },

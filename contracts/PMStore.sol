@@ -21,6 +21,8 @@ contract PMStore is Ownable, ReentrancyGuard {
         ProductCategory category;
         bool isActive;
         uint256 totalSold;
+        uint256 totalRatings;
+        uint256 ratingSum;
     }
     
     struct Order {
@@ -45,6 +47,17 @@ contract PMStore is Ownable, ReentrancyGuard {
         bool isActive;
     }
     
+    struct Rating {
+        address user;
+        uint256 productId;
+        uint8 rating;
+        uint256 timestamp;
+        bool rewarded;
+    }
+    
+    // Rating reward amount in PM tokens (with 18 decimals)
+    uint256 public ratingReward = 10 * 10**18; // 10 PM tokens per rating
+    
     // State variables
     uint256 public productCount;
     uint256 public orderCount;
@@ -55,6 +68,9 @@ contract PMStore is Ownable, ReentrancyGuard {
     mapping(uint256 => Order) public orders;
     mapping(string => VoucherCode) public vouchers;
     mapping(address => uint256[]) public userOrders;
+    mapping(address => mapping(uint256 => bool)) public hasRated; // user => productId => rated
+    mapping(uint256 => Rating[]) public productRatings; // productId => ratings
+    uint256 public totalRatingsCount;
     
     // Events
     event ProductAdded(uint256 indexed productId, string name, uint256 price, ProductCategory category);
@@ -65,6 +81,7 @@ contract PMStore is Ownable, ReentrancyGuard {
     event VoucherCreated(string code, uint256 discountPercent, uint256 maxUses);
     event VoucherUsed(string code, address indexed user, uint256 discount);
     event FundsWithdrawn(address indexed to, uint256 amount);
+    event ProductRated(uint256 indexed productId, address indexed user, uint8 rating, uint256 reward);
     
     constructor(address _pmToken) Ownable(msg.sender) {
         pmToken = IERC20(_pmToken);
@@ -89,7 +106,9 @@ contract PMStore is Ownable, ReentrancyGuard {
             stock: _stock,
             category: _category,
             isActive: true,
-            totalSold: 0
+            totalSold: 0,
+            totalRatings: 0,
+            ratingSum: 0
         });
         
         emit ProductAdded(productCount, _name, _price, _category);
@@ -274,5 +293,56 @@ contract PMStore is Ownable, ReentrancyGuard {
     
     function setPMToken(address _pmToken) external onlyOwner {
         pmToken = IERC20(_pmToken);
+    }
+    
+    function setRatingReward(uint256 _reward) external onlyOwner {
+        ratingReward = _reward;
+    }
+    
+    // Rating Functions
+    function rateProduct(uint256 _productId, uint8 _rating) external nonReentrant {
+        require(_productId > 0 && _productId <= productCount, "Invalid product");
+        require(_rating >= 1 && _rating <= 5, "Rating must be 1-5");
+        require(!hasRated[msg.sender][_productId], "Already rated");
+        require(products[_productId].isActive, "Product inactive");
+        
+        hasRated[msg.sender][_productId] = true;
+        
+        Product storage product = products[_productId];
+        product.totalRatings++;
+        product.ratingSum += _rating;
+        
+        productRatings[_productId].push(Rating({
+            user: msg.sender,
+            productId: _productId,
+            rating: _rating,
+            timestamp: block.timestamp,
+            rewarded: true
+        }));
+        
+        totalRatingsCount++;
+        
+        // Send reward to user
+        if (ratingReward > 0 && pmToken.balanceOf(address(this)) >= ratingReward) {
+            require(pmToken.transfer(msg.sender, ratingReward), "Reward failed");
+        }
+        
+        emit ProductRated(_productId, msg.sender, _rating, ratingReward);
+    }
+    
+    function getProductRating(uint256 _productId) external view returns (uint256 avgRating, uint256 totalRatings) {
+        Product memory product = products[_productId];
+        if (product.totalRatings == 0) {
+            return (0, 0);
+        }
+        return ((product.ratingSum * 10) / product.totalRatings, product.totalRatings);
+    }
+    
+    function getUserRatedProduct(address _user, uint256 _productId) external view returns (bool) {
+        return hasRated[_user][_productId];
+    }
+    
+    function getProductRatings(uint256 _productId) external view returns (Rating[] memory) {
+        return productRatings[_productId];
     }
 }
