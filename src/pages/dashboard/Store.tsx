@@ -50,6 +50,7 @@ import { PM_TOKEN_ADDRESS, CONTRACT_ADDRESSES } from "@/contracts/addresses";
 import { PMTokenABI } from "@/contracts/abis";
 import { PMStoreABI } from "@/contracts/storeABI";
 import { useOrderHistory } from "@/hooks/useOrderHistory";
+import { ProductReviewsModal } from "@/components/store/ProductReviewsModal";
 
 interface Product {
   id: number;
@@ -104,6 +105,10 @@ const StorePage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [reviewProductId, setReviewProductId] = useState<number | null>(null);
+  const [reviewProductName, setReviewProductName] = useState("");
+  const [reviewProductImage, setReviewProductImage] = useState("");
   const [ratingProductId, setRatingProductId] = useState<number | null>(null);
   const [selectedRating, setSelectedRating] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -473,6 +478,13 @@ const StorePage = () => {
     }
   };
 
+  const handleOpenReviewsModal = (product: Product) => {
+    setReviewProductId(product.id);
+    setReviewProductName(product.name);
+    setReviewProductImage(product.image);
+    setShowReviewsModal(true);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
       <Header />
@@ -638,13 +650,18 @@ const StorePage = () => {
                   
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => handleOpenRatingModal(product.id)}
+                      onClick={() => handleOpenReviewsModal(product)}
                       className="flex items-center gap-1 hover:opacity-80 transition-opacity"
                     >
                       <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
                       <span className="text-xs">{product.rating.toFixed(1)}</span>
                     </button>
-                    <span className="text-xs text-muted-foreground">({product.totalRatings} ratings)</span>
+                    <button
+                      onClick={() => handleOpenReviewsModal(product)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      ({product.totalRatings} reviews)
+                    </button>
                     <span className="text-xs text-muted-foreground">• {product.sales} sold</span>
                   </div>
                   
@@ -1190,6 +1207,20 @@ const StorePage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reviews Modal */}
+      {reviewProductId !== null && (
+        <ProductReviewsModal
+          isOpen={showReviewsModal}
+          onClose={() => {
+            setShowReviewsModal(false);
+            setReviewProductId(null);
+          }}
+          productId={reviewProductId}
+          productName={reviewProductName}
+          productImage={reviewProductImage}
+        />
+      )}
 
       <Footer />
       <MobileBottomNav />
