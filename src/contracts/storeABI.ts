@@ -81,6 +81,71 @@ export const PMStoreABI = [
     stateMutability: "nonpayable",
     type: "function"
   },
+  // Rating Functions
+  {
+    inputs: [
+      { internalType: "uint256", name: "_productId", type: "uint256" },
+      { internalType: "uint8", name: "_rating", type: "uint8" }
+    ],
+    name: "rateProduct",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "_productId", type: "uint256" }],
+    name: "getProductRating",
+    outputs: [
+      { internalType: "uint256", name: "avgRating", type: "uint256" },
+      { internalType: "uint256", name: "totalRatings", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "_user", type: "address" },
+      { internalType: "uint256", name: "_productId", type: "uint256" }
+    ],
+    name: "getUserRatedProduct",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "_productId", type: "uint256" }],
+    name: "getProductRatings",
+    outputs: [
+      {
+        components: [
+          { internalType: "address", name: "user", type: "address" },
+          { internalType: "uint256", name: "productId", type: "uint256" },
+          { internalType: "uint8", name: "rating", type: "uint8" },
+          { internalType: "uint256", name: "timestamp", type: "uint256" },
+          { internalType: "bool", name: "rewarded", type: "bool" }
+        ],
+        internalType: "struct PMStore.Rating[]",
+        name: "",
+        type: "tuple[]"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "ratingReward",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "_reward", type: "uint256" }],
+    name: "setRatingReward",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
   // View Functions
   {
     inputs: [{ internalType: "uint256", name: "_productId", type: "uint256" }],
@@ -96,7 +161,9 @@ export const PMStoreABI = [
           { internalType: "uint256", name: "stock", type: "uint256" },
           { internalType: "uint8", name: "category", type: "uint8" },
           { internalType: "bool", name: "isActive", type: "bool" },
-          { internalType: "uint256", name: "totalSold", type: "uint256" }
+          { internalType: "uint256", name: "totalSold", type: "uint256" },
+          { internalType: "uint256", name: "totalRatings", type: "uint256" },
+          { internalType: "uint256", name: "ratingSum", type: "uint256" }
         ],
         internalType: "struct PMStore.Product",
         name: "",
@@ -173,7 +240,9 @@ export const PMStoreABI = [
           { internalType: "uint256", name: "stock", type: "uint256" },
           { internalType: "uint8", name: "category", type: "uint8" },
           { internalType: "bool", name: "isActive", type: "bool" },
-          { internalType: "uint256", name: "totalSold", type: "uint256" }
+          { internalType: "uint256", name: "totalSold", type: "uint256" },
+          { internalType: "uint256", name: "totalRatings", type: "uint256" },
+          { internalType: "uint256", name: "ratingSum", type: "uint256" }
         ],
         internalType: "struct PMStore.Product[]",
         name: "",
@@ -219,6 +288,13 @@ export const PMStoreABI = [
   {
     inputs: [],
     name: "totalOrders",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "totalRatingsCount",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function"
@@ -285,6 +361,17 @@ export const PMStoreABI = [
       { indexed: false, internalType: "uint8", name: "status", type: "uint8" }
     ],
     name: "OrderStatusUpdated",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "uint256", name: "productId", type: "uint256" },
+      { indexed: true, internalType: "address", name: "user", type: "address" },
+      { indexed: false, internalType: "uint8", name: "rating", type: "uint8" },
+      { indexed: false, internalType: "uint256", name: "reward", type: "uint256" }
+    ],
+    name: "ProductRated",
     type: "event"
   }
 ] as const;
