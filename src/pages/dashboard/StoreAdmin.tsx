@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, ShoppingCart, BarChart3, Ticket, Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Package, ShoppingCart, BarChart3, Ticket, Plus, Edit, Trash2, Eye, EyeOff, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { parseEther, formatEther } from "viem";
@@ -47,6 +48,10 @@ const StoreAdmin = () => {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [newOrderStatus, setNewOrderStatus] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [sendEmailNotification, setSendEmailNotification] = useState(true);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   
   // Read contract data
   const { data: ownerAddress } = useReadContract({
@@ -194,8 +199,47 @@ const StoreAdmin = () => {
       } as any);
       
       toast.success("Order status updated!");
+      
+      // Send email notification if enabled and email provided
+      if (sendEmailNotification && customerEmail) {
+        setIsSendingEmail(true);
+        try {
+          const response = await fetch(
+            'https://ihuqvxvcqnrdxphqxpqr.supabase.co/functions/v1/send-order-status-email',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: customerEmail,
+                customerName: customerName || 'Valued Customer',
+                orderNumber: `PM${selectedOrderId.padStart(8, '0')}`,
+                newStatus: newOrderStatus,
+              }),
+            }
+          );
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error("Email error:", data);
+            toast.error("Order updated but failed to send email notification");
+          } else {
+            toast.success("Email notification sent to customer!");
+          }
+        } catch (emailError) {
+          console.error("Email error:", emailError);
+          toast.error("Order updated but failed to send email notification");
+        } finally {
+          setIsSendingEmail(false);
+        }
+      }
+      
       setSelectedOrderId("");
       setNewOrderStatus("");
+      setCustomerEmail("");
+      setCustomerName("");
     } catch (error: any) {
       toast.error(error.message || "Failed to update order status");
     }
@@ -476,10 +520,13 @@ const StoreAdmin = () => {
           <TabsContent value="orders" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Update Order Status</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Update Order Status & Notify Customer
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Order ID</Label>
                     <Input
@@ -501,12 +548,56 @@ const StoreAdmin = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end">
-                    <Button onClick={handleUpdateOrderStatus} disabled={!selectedOrderId || !newOrderStatus}>
-                      Update Status
-                    </Button>
+                  <div className="space-y-2">
+                    <Label>Customer Name (optional)</Label>
+                    <Input
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Customer Email</Label>
+                    <Input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="customer@email.com"
+                    />
                   </div>
                 </div>
+                
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox 
+                    id="sendEmail" 
+                    checked={sendEmailNotification}
+                    onCheckedChange={(checked) => setSendEmailNotification(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="sendEmail"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Send email notification to customer
+                  </label>
+                </div>
+                
+                <Button 
+                  onClick={handleUpdateOrderStatus} 
+                  disabled={!selectedOrderId || !newOrderStatus || isSendingEmail}
+                  className="w-full md:w-auto"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Update Status {sendEmailNotification && customerEmail ? "& Send Email" : ""}
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
 

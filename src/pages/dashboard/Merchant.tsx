@@ -310,7 +310,7 @@ const MerchantPage = () => {
                 <code className="text-sm text-muted-foreground font-mono break-all">{apiKey || "Generating..."}</code>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <Button 
                   variant="gradient" 
                   size="sm"
@@ -328,6 +328,15 @@ const MerchantPage = () => {
                 >
                   <LinkIcon className="h-4 w-4 mr-1 lg:mr-2" />
                   <span className="hidden sm:inline">Create</span> Link
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs lg:text-sm"
+                  onClick={() => navigate('/dashboard/merchant/api')}
+                >
+                  <Globe className="h-4 w-4 mr-1 lg:mr-2" />
+                  API
                 </Button>
               </div>
             </div>
