@@ -66,6 +66,7 @@ import BrandAssets from "./pages/BrandAssets";
 import Downloads from "./pages/Downloads";
 import StorePage from "./pages/dashboard/Store";
 import OrderHistoryPage from "./pages/dashboard/OrderHistory";
+import StoreAdminPage from "./pages/dashboard/StoreAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -128,6 +129,7 @@ const App = () => (
               <Route path="/dashboard/merchant/promotions" element={<MerchantPromotion />} />
               <Route path="/dashboard/store" element={<StorePage />} />
               <Route path="/dashboard/store/orders" element={<OrderHistoryPage />} />
+              <Route path="/dashboard/store/admin" element={<StoreAdminPage />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/tokenomics" element={<Tokenomics />} />
               <Route path="/whitepaper" element={<Whitepaper />} />

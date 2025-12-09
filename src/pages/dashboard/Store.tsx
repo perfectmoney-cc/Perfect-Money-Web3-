@@ -546,6 +546,12 @@ const StorePage = () => {
             Back to Dashboard
           </Link>
           <div className="flex items-center gap-2">
+            <Link to="/dashboard/store/admin">
+              <Button variant="outline" size="sm">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Admin
+              </Button>
+            </Link>
             <Link to="/dashboard/store/orders">
               <Button variant="outline" size="sm">
                 <History className="h-4 w-4 mr-2" />
