@@ -499,6 +499,90 @@ console.log(data.payment_url);`}
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* Webhook Integration */}
+        <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-purple-500" />
+              <CardTitle>Webhook Integration</CardTitle>
+            </div>
+            <CardDescription>Receive real-time payment status updates</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-background/50 rounded-lg border space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Webhook Endpoint</Label>
+                <code className="block mt-1 p-2 bg-muted rounded text-sm font-mono">
+                  https://ihuqvxvcqnrdxphqxpqr.supabase.co/functions/v1/payment-webhook
+                </code>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">Supported Events</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline">payment.created</Badge>
+                  <Badge variant="outline">payment.completed</Badge>
+                  <Badge variant="outline">payment.failed</Badge>
+                  <Badge variant="outline">payment.expired</Badge>
+                  <Badge variant="outline">payment.refunded</Badge>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Webhook Payload Example</Label>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto text-purple-400">
+{`{
+  "event": "payment.completed",
+  "payment_id": "pay_abc123xyz",
+  "merchant_id": "${address?.slice(0, 10) || 'your_id'}",
+  "amount": "100.00",
+  "currency": "PM",
+  "order_id": "ORDER-12345",
+  "tx_hash": "0x1234...abcd",
+  "status": "completed",
+  "timestamp": "${new Date().toISOString()}"
+}`}
+              </pre>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Signature Verification</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Verify webhook authenticity using the X-Webhook-Signature header with your secret key:
+              </p>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+{`// Verify webhook signature
+const crypto = require('crypto');
+
+function verifyWebhook(payload, signature, secret) {
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+  return signature === expected;
+}
+
+// In your webhook handler
+app.post('/webhook', (req, res) => {
+  const signature = req.headers['x-webhook-signature'];
+  const isValid = verifyWebhook(req.body, signature, YOUR_SECRET);
+  
+  if (!isValid) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  // Process the webhook event
+  const { event, payment_id, status } = req.body;
+  console.log(\`Payment \${payment_id}: \${event}\`);
+  
+  res.status(200).send('OK');
+});`}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
       </main>
       
       <Footer />
