@@ -438,6 +438,41 @@ const StorePage = () => {
     }
   };
 
+  const handleOpenRatingModal = (productId: number) => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet to rate products");
+      return;
+    }
+    setRatingProductId(productId);
+    setSelectedRating(0);
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!storeAddress || ratingProductId === null || selectedRating === 0) return;
+    
+    setIsRating(true);
+    try {
+      await rateProductAsync({
+        address: storeAddress,
+        abi: PMStoreABI,
+        functionName: "rateProduct",
+        args: [BigInt(ratingProductId), BigInt(selectedRating)]
+      } as any);
+      
+      toast.success(`Thank you for rating! You earned PM tokens as a reward!`);
+      setShowRatingModal(false);
+      setSelectedRating(0);
+      setRatingProductId(null);
+      refetchProducts();
+    } catch (error: any) {
+      console.error("Rating error:", error);
+      toast.error(error.message || "Failed to submit rating");
+    } finally {
+      setIsRating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
       <Header />
@@ -602,9 +637,15 @@ const StorePage = () => {
                   <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
                   
                   <div className="flex items-center gap-2">
-                    <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                    <span className="text-xs">{product.rating}</span>
-                    <span className="text-xs text-muted-foreground">({product.sales} sold)</span>
+                    <button 
+                      onClick={() => handleOpenRatingModal(product.id)}
+                      className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                    >
+                      <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                      <span className="text-xs">{product.rating.toFixed(1)}</span>
+                    </button>
+                    <span className="text-xs text-muted-foreground">({product.totalRatings} ratings)</span>
+                    <span className="text-xs text-muted-foreground">• {product.sales} sold</span>
                   </div>
                   
                   <div className="flex items-center justify-between pt-2">
@@ -616,13 +657,23 @@ const StorePage = () => {
                         </span>
                       )}
                     </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleBuyNow(product)}
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      Buy
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenRatingModal(product.id)}
+                        className="px-2"
+                      >
+                        <Star className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleBuyNow(product)}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        Buy
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -1054,6 +1105,87 @@ const StorePage = () => {
             </Link>
             <Button onClick={() => setShowSuccessModal(false)} className="bg-primary">
               Continue Shopping
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rating Modal */}
+      <Dialog open={showRatingModal} onOpenChange={setShowRatingModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-primary" />
+              Rate This Product
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-6 space-y-6">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-4">
+                How would you rate this product?
+              </p>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setSelectedRating(star)}
+                    className="transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={`h-10 w-10 ${
+                        star <= selectedRating
+                          ? "text-yellow-500 fill-yellow-500"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-lg font-semibold">
+                {selectedRating > 0 ? `${selectedRating} Star${selectedRating > 1 ? 's' : ''}` : 'Select a rating'}
+              </p>
+            </div>
+
+            <Card className="p-4 bg-gradient-to-r from-primary/10 to-rose-500/10 border-primary/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Coins className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-primary">Earn PM Token Reward!</p>
+                  <p className="text-xs text-muted-foreground">
+                    Receive {ratingReward ? formatUnits(ratingReward as bigint, 18) : '10'} PM tokens for rating
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowRatingModal(false);
+              setSelectedRating(0);
+              setRatingProductId(null);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitRating}
+              disabled={selectedRating === 0 || isRating || !isConnected}
+              className="bg-gradient-to-r from-primary to-rose-600"
+            >
+              {isRating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Star className="h-4 w-4 mr-2" />
+                  Submit Rating
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
