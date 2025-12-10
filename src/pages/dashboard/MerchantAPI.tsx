@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
 import { TradingViewTicker } from "@/components/TradingViewTicker";
@@ -161,19 +162,26 @@ const MerchantAPI = () => {
     environment: "sandbox" | "production"; 
     currentSecretKey: string;
   }) => {
+    const navigate = useNavigate();
     const [webhookUrl, setWebhookUrl] = useState("");
     const [selectedEvent, setSelectedEvent] = useState("payment.completed");
     const [customAmount, setCustomAmount] = useState("100.00");
     const [customOrderId, setCustomOrderId] = useState("TEST-ORDER-001");
     const [isSending, setIsSending] = useState(false);
+    const [enableRetry, setEnableRetry] = useState(true);
+    const [maxRetries, setMaxRetries] = useState(5);
+    const [currentRetry, setCurrentRetry] = useState(0);
+    const [retryProgress, setRetryProgress] = useState(0);
     const [testResults, setTestResults] = useState<Array<{
       id: string;
       event: string;
-      status: "success" | "error" | "pending";
+      status: "success" | "error" | "pending" | "retrying";
       responseCode?: number;
       responseTime?: number;
       timestamp: Date;
       error?: string;
+      retryCount?: number;
+      nextRetryIn?: number;
     }>>([]);
 
     const webhookEvents = [
@@ -203,6 +211,50 @@ const MerchantAPI = () => {
       };
     };
 
+    // Calculate exponential backoff delay in milliseconds
+    const getRetryDelay = (attempt: number): number => {
+      // Base delay of 1 second, doubling each attempt (1s, 2s, 4s, 8s, 16s)
+      const baseDelay = 1000;
+      const delay = baseDelay * Math.pow(2, attempt);
+      // Add jitter (±10%) to prevent thundering herd
+      const jitter = delay * 0.1 * (Math.random() * 2 - 1);
+      return Math.min(delay + jitter, 30000); // Cap at 30 seconds
+    };
+
+    const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+    const attemptWebhookDelivery = async (
+      url: string,
+      payload: Record<string, unknown>,
+      testId: string,
+      attempt: number
+    ): Promise<{ success: boolean; responseTime: number; error?: string }> => {
+      const startTime = Date.now();
+      
+      try {
+        await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Webhook-Signature': `sha256_test_${Date.now()}`,
+            'X-Webhook-Environment': environment,
+            'X-Webhook-Test': 'true',
+            'X-Webhook-Attempt': String(attempt + 1)
+          },
+          body: JSON.stringify(payload),
+          mode: 'no-cors'
+        });
+
+        return { success: true, responseTime: Date.now() - startTime };
+      } catch (error) {
+        return { 
+          success: false, 
+          responseTime: Date.now() - startTime,
+          error: error instanceof Error ? error.message : "Failed to send"
+        };
+      }
+    };
+
     const sendTestWebhook = async () => {
       if (!webhookUrl) {
         toast.error("Please enter a webhook URL");
@@ -217,53 +269,87 @@ const MerchantAPI = () => {
       }
 
       setIsSending(true);
+      setCurrentRetry(0);
+      setRetryProgress(0);
+      
       const testId = `test_${Date.now()}`;
       const payload = generateTestPayload(selectedEvent);
-      const startTime = Date.now();
 
       setTestResults(prev => [{
         id: testId,
         event: selectedEvent,
         status: "pending",
-        timestamp: new Date()
+        timestamp: new Date(),
+        retryCount: 0
       }, ...prev.slice(0, 9)]);
 
-      try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Webhook-Signature': `sha256_test_${Date.now()}`,
-            'X-Webhook-Environment': environment,
-            'X-Webhook-Test': 'true'
-          },
-          body: JSON.stringify(payload),
-          mode: 'no-cors'
-        });
+      let lastResult = await attemptWebhookDelivery(webhookUrl, payload, testId, 0);
+      let attempt = 0;
 
-        const responseTime = Date.now() - startTime;
-
-        // Since we're using no-cors, we can't read the response
-        // We'll assume success if no error is thrown
+      // If failed and retry is enabled, attempt retries with exponential backoff
+      while (!lastResult.success && enableRetry && attempt < maxRetries - 1) {
+        attempt++;
+        setCurrentRetry(attempt);
+        
+        const delay = getRetryDelay(attempt);
+        const delaySeconds = Math.ceil(delay / 1000);
+        
+        // Update status to retrying
         setTestResults(prev => prev.map(r => 
           r.id === testId 
-            ? { ...r, status: "success" as const, responseCode: 200, responseTime }
+            ? { 
+                ...r, 
+                status: "retrying" as const, 
+                retryCount: attempt,
+                nextRetryIn: delaySeconds
+              }
             : r
         ));
 
-        toast.success(`Test webhook sent successfully (${responseTime}ms)`);
-      } catch (error) {
-        const responseTime = Date.now() - startTime;
-        setTestResults(prev => prev.map(r => 
-          r.id === testId 
-            ? { ...r, status: "error" as const, responseTime, error: error instanceof Error ? error.message : "Failed to send" }
-            : r
-        ));
+        // Show countdown progress
+        const progressInterval = 100;
+        const steps = delay / progressInterval;
+        for (let i = 0; i <= steps; i++) {
+          await sleep(progressInterval);
+          setRetryProgress((i / steps) * 100);
+        }
 
-        toast.error("Failed to send test webhook");
-      } finally {
-        setIsSending(false);
+        toast.info(`Retry attempt ${attempt + 1}/${maxRetries}...`);
+        lastResult = await attemptWebhookDelivery(webhookUrl, payload, testId, attempt);
       }
+
+      // Update final result
+      if (lastResult.success) {
+        setTestResults(prev => prev.map(r => 
+          r.id === testId 
+            ? { 
+                ...r, 
+                status: "success" as const, 
+                responseCode: 200, 
+                responseTime: lastResult.responseTime,
+                retryCount: attempt
+              }
+            : r
+        ));
+        toast.success(`Webhook delivered successfully after ${attempt + 1} attempt(s) (${lastResult.responseTime}ms)`);
+      } else {
+        setTestResults(prev => prev.map(r => 
+          r.id === testId 
+            ? { 
+                ...r, 
+                status: "error" as const, 
+                responseTime: lastResult.responseTime, 
+                error: lastResult.error,
+                retryCount: attempt + 1
+              }
+            : r
+        ));
+        toast.error(`Webhook delivery failed after ${attempt + 1} attempt(s)`);
+      }
+
+      setIsSending(false);
+      setCurrentRetry(0);
+      setRetryProgress(0);
     };
 
     const clearResults = () => {
@@ -344,6 +430,48 @@ const MerchantAPI = () => {
             </div>
           </div>
 
+          {/* Retry Settings */}
+          <div className="p-4 bg-background/50 rounded-lg border space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-orange-500" />
+                <Label htmlFor="enable-retry" className="font-medium">Enable Retry with Exponential Backoff</Label>
+              </div>
+              <Switch
+                id="enable-retry"
+                checked={enableRetry}
+                onCheckedChange={setEnableRetry}
+              />
+            </div>
+            
+            {enableRetry && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="max-retries">Maximum Retries: {maxRetries}</Label>
+                  <Input
+                    id="max-retries"
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={maxRetries}
+                    onChange={(e) => setMaxRetries(parseInt(e.target.value))}
+                    className="cursor-pointer"
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>Retry delays with exponential backoff:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: maxRetries }, (_, i) => (
+                      <Badge key={i} variant="outline" className="text-orange-500">
+                        #{i + 1}: {i === 0 ? "Immediate" : `${Math.pow(2, i)}s`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Payload Preview */}
           <div className="space-y-2">
             <Label>Payload Preview</Label>
@@ -351,6 +479,24 @@ const MerchantAPI = () => {
               {JSON.stringify(generateTestPayload(selectedEvent), null, 2)}
             </pre>
           </div>
+
+          {/* Retry Progress */}
+          {isSending && currentRetry > 0 && (
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-yellow-500 animate-spin" />
+                  <span className="text-yellow-500 font-medium">
+                    Retry Attempt {currentRetry + 1}/{maxRetries}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Waiting with exponential backoff...
+                </span>
+              </div>
+              <Progress value={retryProgress} className="h-2" />
+            </div>
+          )}
 
           {/* Send Button */}
           <div className="flex gap-3">
@@ -360,10 +506,17 @@ const MerchantAPI = () => {
               className="flex-1 bg-orange-500 hover:bg-orange-600"
             >
               {isSending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
+                currentRetry > 0 ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Retrying ({currentRetry + 1}/{maxRetries})...
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                )
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
@@ -377,6 +530,16 @@ const MerchantAPI = () => {
               </Button>
             )}
           </div>
+          
+          {/* View All Logs Link */}
+          <Button 
+            variant="outline" 
+            className="w-full border-orange-500/30 hover:bg-orange-500/10"
+            onClick={() => navigate("/dashboard/merchant/webhook-logs")}
+          >
+            <History className="h-4 w-4 mr-2" />
+            View All Webhook Logs
+          </Button>
 
           {/* Test Results */}
           {testResults.length > 0 && (
@@ -391,7 +554,9 @@ const MerchantAPI = () => {
                         ? "border-green-500/30 bg-green-500/5"
                         : result.status === "error"
                         ? "border-red-500/30 bg-red-500/5"
-                        : "border-yellow-500/30 bg-yellow-500/5"
+                        : result.status === "retrying"
+                        ? "border-yellow-500/30 bg-yellow-500/5"
+                        : "border-blue-500/30 bg-blue-500/5"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -399,14 +564,26 @@ const MerchantAPI = () => {
                         <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : result.status === "error" ? (
                         <XCircle className="h-5 w-5 text-red-500" />
+                      ) : result.status === "retrying" ? (
+                        <RefreshCw className="h-5 w-5 text-yellow-500 animate-spin" />
                       ) : (
-                        <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                        <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
                       )}
                       <div>
-                        <div className="font-medium text-sm">{result.event}</div>
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          {result.event}
+                          {result.retryCount !== undefined && result.retryCount > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {result.retryCount} {result.retryCount === 1 ? "retry" : "retries"}
+                            </Badge>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {result.timestamp.toLocaleTimeString()}
-                          {result.error && ` - ${result.error}`}
+                          {result.status === "retrying" && result.nextRetryIn && (
+                            <span className="text-yellow-500"> • Next retry in {result.nextRetryIn}s</span>
+                          )}
+                          {result.error && <span className="text-red-400"> • {result.error}</span>}
                         </div>
                       </div>
                     </div>
@@ -415,7 +592,7 @@ const MerchantAPI = () => {
                         <Badge variant="outline" className={
                           result.responseCode === 200 ? "text-green-500" : "text-red-500"
                         }>
-                          {result.responseCode}
+                          HTTP {result.responseCode}
                         </Badge>
                       )}
                       {result.responseTime && (
