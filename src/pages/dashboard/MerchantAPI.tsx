@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -622,6 +622,441 @@ const MerchantAPI = () => {
     );
   };
 
+  // Webhook Health Check Component
+  const WebhookHealthCheck = ({
+    environment
+  }: {
+    environment: "sandbox" | "production";
+  }) => {
+    const [endpoints, setEndpoints] = useState<Array<{
+      id: string;
+      url: string;
+      name: string;
+      status: "healthy" | "degraded" | "unhealthy" | "checking" | "unknown";
+      lastChecked: Date | null;
+      responseTime: number | null;
+      uptime: number;
+      consecutiveFailures: number;
+      history: Array<{
+        timestamp: Date;
+        status: "healthy" | "unhealthy";
+        responseTime: number;
+      }>;
+    }>>([]);
+    const [newEndpointUrl, setNewEndpointUrl] = useState("");
+    const [newEndpointName, setNewEndpointName] = useState("");
+    const [isMonitoring, setIsMonitoring] = useState(false);
+    const [checkInterval, setCheckInterval] = useState(60); // seconds
+    const [isAddingEndpoint, setIsAddingEndpoint] = useState(false);
+
+    // Check a single endpoint health
+    const checkEndpointHealth = useCallback(async (endpoint: typeof endpoints[0]) => {
+      const startTime = Date.now();
+      
+      try {
+        // Update status to checking
+        setEndpoints(prev => prev.map(ep => 
+          ep.id === endpoint.id ? { ...ep, status: "checking" as const } : ep
+        ));
+
+        // Send a HEAD request to check availability
+        await fetch(endpoint.url, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          headers: {
+            'X-Health-Check': 'true',
+            'X-PM-Environment': environment
+          }
+        });
+
+        const responseTime = Date.now() - startTime;
+        const isHealthy = responseTime < 5000; // Consider healthy if under 5 seconds
+        
+        setEndpoints(prev => prev.map(ep => {
+          if (ep.id !== endpoint.id) return ep;
+          
+          const newHistory = [
+            { timestamp: new Date(), status: isHealthy ? "healthy" as const : "unhealthy" as const, responseTime },
+            ...ep.history.slice(0, 99) // Keep last 100 checks
+          ];
+          
+          // Calculate uptime from history
+          const healthyChecks = newHistory.filter(h => h.status === "healthy").length;
+          const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 100;
+          
+          return {
+            ...ep,
+            status: isHealthy ? "healthy" as const : (uptime > 80 ? "degraded" as const : "unhealthy" as const),
+            lastChecked: new Date(),
+            responseTime,
+            uptime,
+            consecutiveFailures: isHealthy ? 0 : ep.consecutiveFailures + 1,
+            history: newHistory
+          };
+        }));
+
+        return { success: isHealthy, responseTime };
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+        
+        setEndpoints(prev => prev.map(ep => {
+          if (ep.id !== endpoint.id) return ep;
+          
+          const newHistory = [
+            { timestamp: new Date(), status: "unhealthy" as const, responseTime },
+            ...ep.history.slice(0, 99)
+          ];
+          
+          const healthyChecks = newHistory.filter(h => h.status === "healthy").length;
+          const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 0;
+          
+          return {
+            ...ep,
+            status: uptime > 80 ? "degraded" as const : "unhealthy" as const,
+            lastChecked: new Date(),
+            responseTime,
+            uptime,
+            consecutiveFailures: ep.consecutiveFailures + 1,
+            history: newHistory
+          };
+        }));
+
+        return { success: false, responseTime };
+      }
+    }, [environment]);
+
+    // Check all endpoints
+    const checkAllEndpoints = useCallback(async () => {
+      for (const endpoint of endpoints) {
+        await checkEndpointHealth(endpoint);
+      }
+    }, [endpoints, checkEndpointHealth]);
+
+    // Periodic monitoring
+    useEffect(() => {
+      if (!isMonitoring || endpoints.length === 0) return;
+
+      const intervalId = setInterval(() => {
+        checkAllEndpoints();
+      }, checkInterval * 1000);
+
+      return () => clearInterval(intervalId);
+    }, [isMonitoring, checkInterval, endpoints.length, checkAllEndpoints]);
+
+    // Add new endpoint
+    const addEndpoint = () => {
+      if (!newEndpointUrl) {
+        toast.error("Please enter a webhook URL");
+        return;
+      }
+
+      try {
+        new URL(newEndpointUrl);
+      } catch {
+        toast.error("Please enter a valid URL");
+        return;
+      }
+
+      const newEndpoint = {
+        id: `ep_${Date.now()}`,
+        url: newEndpointUrl,
+        name: newEndpointName || new URL(newEndpointUrl).hostname,
+        status: "unknown" as const,
+        lastChecked: null,
+        responseTime: null,
+        uptime: 100,
+        consecutiveFailures: 0,
+        history: []
+      };
+
+      setEndpoints(prev => [...prev, newEndpoint]);
+      setNewEndpointUrl("");
+      setNewEndpointName("");
+      setIsAddingEndpoint(false);
+      toast.success("Endpoint added! Click 'Check Now' to verify its health.");
+    };
+
+    // Remove endpoint
+    const removeEndpoint = (id: string) => {
+      setEndpoints(prev => prev.filter(ep => ep.id !== id));
+      toast.success("Endpoint removed");
+    };
+
+    // Get status color and icon
+    const getStatusIndicator = (status: string) => {
+      switch (status) {
+        case "healthy":
+          return { color: "text-green-500", bgColor: "bg-green-500", icon: Wifi };
+        case "degraded":
+          return { color: "text-yellow-500", bgColor: "bg-yellow-500", icon: AlertTriangle };
+        case "unhealthy":
+          return { color: "text-red-500", bgColor: "bg-red-500", icon: WifiOff };
+        case "checking":
+          return { color: "text-blue-500", bgColor: "bg-blue-500", icon: Loader2 };
+        default:
+          return { color: "text-muted-foreground", bgColor: "bg-muted", icon: Clock };
+      }
+    };
+
+    return (
+      <Card className="border-cyan-500/30 bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-cyan-500" />
+              <CardTitle>Webhook Endpoint Health Check</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-cyan-500/50 text-cyan-500">
+                {endpoints.length} Endpoint{endpoints.length !== 1 ? "s" : ""}
+              </Badge>
+              {isMonitoring && (
+                <Badge className="bg-green-500 animate-pulse">
+                  Monitoring
+                </Badge>
+              )}
+            </div>
+          </div>
+          <CardDescription>Monitor your webhook endpoints' availability and performance</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Add Endpoint Section */}
+          {isAddingEndpoint ? (
+            <div className="p-4 bg-background/50 rounded-lg border space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="endpoint-name">Endpoint Name (optional)</Label>
+                  <Input
+                    id="endpoint-name"
+                    placeholder="Production Webhook"
+                    value={newEndpointName}
+                    onChange={(e) => setNewEndpointName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endpoint-url">Webhook URL</Label>
+                  <Input
+                    id="endpoint-url"
+                    placeholder="https://yoursite.com/api/webhook"
+                    value={newEndpointUrl}
+                    onChange={(e) => setNewEndpointUrl(e.target.value)}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={addEndpoint} className="bg-cyan-500 hover:bg-cyan-600">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Add Endpoint
+                </Button>
+                <Button variant="outline" onClick={() => setIsAddingEndpoint(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              onClick={() => setIsAddingEndpoint(true)}
+              variant="outline"
+              className="w-full border-dashed border-cyan-500/50 hover:bg-cyan-500/10"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Add Webhook Endpoint to Monitor
+            </Button>
+          )}
+
+          {/* Monitoring Controls */}
+          {endpoints.length > 0 && (
+            <div className="flex flex-wrap items-center gap-4 p-4 bg-background/50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => setIsMonitoring(!isMonitoring)}
+                  variant={isMonitoring ? "destructive" : "default"}
+                  size="sm"
+                  className={!isMonitoring ? "bg-cyan-500 hover:bg-cyan-600" : ""}
+                >
+                  {isMonitoring ? (
+                    <>
+                      <Pause className="h-4 w-4 mr-2" />
+                      Stop Monitoring
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Monitoring
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={checkAllEndpoints}
+                  variant="outline"
+                  size="sm"
+                  disabled={endpoints.some(ep => ep.status === "checking")}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${endpoints.some(ep => ep.status === "checking") ? "animate-spin" : ""}`} />
+                  Check Now
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2 ml-auto">
+                <Label htmlFor="check-interval" className="text-sm whitespace-nowrap">Check every:</Label>
+                <select
+                  id="check-interval"
+                  value={checkInterval}
+                  onChange={(e) => setCheckInterval(parseInt(e.target.value))}
+                  className="bg-background border rounded-md px-3 py-1 text-sm"
+                >
+                  <option value={30}>30 seconds</option>
+                  <option value={60}>1 minute</option>
+                  <option value={300}>5 minutes</option>
+                  <option value={600}>10 minutes</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Endpoints List */}
+          {endpoints.length > 0 ? (
+            <div className="space-y-3">
+              {endpoints.map((endpoint) => {
+                const statusInfo = getStatusIndicator(endpoint.status);
+                const StatusIcon = statusInfo.icon;
+                
+                return (
+                  <div
+                    key={endpoint.id}
+                    className={`p-4 rounded-lg border transition-all ${
+                      endpoint.status === "healthy"
+                        ? "border-green-500/30 bg-green-500/5"
+                        : endpoint.status === "degraded"
+                        ? "border-yellow-500/30 bg-yellow-500/5"
+                        : endpoint.status === "unhealthy"
+                        ? "border-red-500/30 bg-red-500/5"
+                        : endpoint.status === "checking"
+                        ? "border-blue-500/30 bg-blue-500/5"
+                        : "border-border"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className={`p-2 rounded-full ${statusInfo.bgColor}/20`}>
+                          <StatusIcon className={`h-5 w-5 ${statusInfo.color} ${endpoint.status === "checking" ? "animate-spin" : ""}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium truncate">{endpoint.name}</h4>
+                            <Badge variant="outline" className={statusInfo.color}>
+                              {endpoint.status === "checking" ? "Checking..." : endpoint.status}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono truncate mt-1">
+                            {endpoint.url}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            {endpoint.lastChecked && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Last checked: {endpoint.lastChecked.toLocaleTimeString()}
+                              </span>
+                            )}
+                            {endpoint.responseTime !== null && (
+                              <span className={`flex items-center gap-1 ${
+                                endpoint.responseTime < 500 ? "text-green-500" :
+                                endpoint.responseTime < 2000 ? "text-yellow-500" : "text-red-500"
+                              }`}>
+                                <Zap className="h-3 w-3" />
+                                {endpoint.responseTime}ms
+                              </span>
+                            )}
+                            <span className={`flex items-center gap-1 ${
+                              endpoint.uptime >= 99 ? "text-green-500" :
+                              endpoint.uptime >= 95 ? "text-yellow-500" : "text-red-500"
+                            }`}>
+                              <Activity className="h-3 w-3" />
+                              {endpoint.uptime.toFixed(1)}% uptime
+                            </span>
+                            {endpoint.consecutiveFailures > 0 && (
+                              <span className="text-red-500 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                {endpoint.consecutiveFailures} consecutive failures
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => checkEndpointHealth(endpoint)}
+                          disabled={endpoint.status === "checking"}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${endpoint.status === "checking" ? "animate-spin" : ""}`} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeEndpoint(endpoint.id)}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Response Time History Mini Chart */}
+                    {endpoint.history.length > 1 && (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted-foreground">Response Time History (last {Math.min(20, endpoint.history.length)} checks)</span>
+                          <span className="text-xs text-muted-foreground">
+                            Avg: {Math.round(endpoint.history.reduce((a, b) => a + b.responseTime, 0) / endpoint.history.length)}ms
+                          </span>
+                        </div>
+                        <div className="flex items-end gap-0.5 h-8">
+                          {endpoint.history.slice(0, 20).reverse().map((h, i) => (
+                            <div
+                              key={i}
+                              className={`flex-1 rounded-t ${
+                                h.status === "healthy" ? "bg-green-500" : "bg-red-500"
+                              }`}
+                              style={{ 
+                                height: `${Math.min(100, (h.responseTime / 3000) * 100)}%`,
+                                minHeight: '4px'
+                              }}
+                              title={`${h.responseTime}ms at ${h.timestamp.toLocaleTimeString()}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No webhook endpoints configured</p>
+              <p className="text-sm mt-1">Add an endpoint to start monitoring its health</p>
+            </div>
+          )}
+
+          {/* Health Check Tips */}
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <h4 className="font-medium text-sm mb-2">💡 Health Check Tips</h4>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li>• Health checks use HEAD requests to minimize bandwidth</li>
+              <li>• Response times under 500ms are considered optimal</li>
+              <li>• Endpoints are marked unhealthy after 3+ consecutive failures</li>
+              <li>• Enable monitoring to receive automatic periodic health checks</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-background flex flex-col pb-20 lg:pb-0">
@@ -977,6 +1412,9 @@ console.log(data.payment_url);`}
           environment={environment}
           currentSecretKey={currentSecretKey}
         />
+
+        {/* Webhook Health Check */}
+        <WebhookHealthCheck environment={environment} />
 
         {/* Webhook Integration */}
         <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
