@@ -68,6 +68,7 @@ import StorePage from "./pages/dashboard/Store";
 import OrderHistoryPage from "./pages/dashboard/OrderHistory";
 import StoreAdminPage from "./pages/dashboard/StoreAdmin";
 import MerchantAPIPage from "./pages/dashboard/MerchantAPI";
+import WebhookLogsPage from "./pages/dashboard/WebhookLogs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -132,6 +133,7 @@ const App = () => (
               <Route path="/dashboard/store/orders" element={<OrderHistoryPage />} />
               <Route path="/dashboard/store/admin" element={<StoreAdminPage />} />
               <Route path="/dashboard/merchant/api" element={<MerchantAPIPage />} />
+              <Route path="/dashboard/merchant/webhook-logs" element={<WebhookLogsPage />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/tokenomics" element={<Tokenomics />} />
               <Route path="/whitepaper" element={<Whitepaper />} />
