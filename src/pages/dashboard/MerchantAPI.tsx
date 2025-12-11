@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2 } from "lucide-react";
+import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2, Mail, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -628,6 +628,7 @@ const MerchantAPI = () => {
   }: {
     environment: "sandbox" | "production";
   }) => {
+    const navigate = useNavigate();
     const [endpoints, setEndpoints] = useState<Array<{
       id: string;
       url: string;
@@ -637,6 +638,7 @@ const MerchantAPI = () => {
       responseTime: number | null;
       uptime: number;
       consecutiveFailures: number;
+      alertSent: boolean;
       history: Array<{
         timestamp: Date;
         status: "healthy" | "unhealthy";
@@ -648,6 +650,51 @@ const MerchantAPI = () => {
     const [isMonitoring, setIsMonitoring] = useState(false);
     const [checkInterval, setCheckInterval] = useState(60); // seconds
     const [isAddingEndpoint, setIsAddingEndpoint] = useState(false);
+    
+    // Email notification settings
+    const [emailAlertEnabled, setEmailAlertEnabled] = useState(false);
+    const [alertEmail, setAlertEmail] = useState("");
+    const [failureThreshold, setFailureThreshold] = useState(3);
+    const [isSendingAlert, setIsSendingAlert] = useState(false);
+
+    // Send downtime alert email
+    const sendDowntimeAlert = async (endpoint: typeof endpoints[0]) => {
+      if (!emailAlertEnabled || !alertEmail || isSendingAlert) return;
+      
+      setIsSendingAlert(true);
+      try {
+        const response = await fetch('https://ihuqvxvcqnrdxphqxpqr.supabase.co/functions/v1/webhook-downtime-alert', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            merchantEmail: alertEmail,
+            endpointName: endpoint.name,
+            endpointUrl: endpoint.url,
+            consecutiveFailures: endpoint.consecutiveFailures,
+            lastResponseTime: endpoint.responseTime,
+            uptime: endpoint.uptime,
+            environment
+          })
+        });
+
+        if (response.ok) {
+          toast.success(`Downtime alert sent to ${alertEmail}`);
+          // Mark alert as sent for this endpoint
+          setEndpoints(prev => prev.map(ep => 
+            ep.id === endpoint.id ? { ...ep, alertSent: true } : ep
+          ));
+        } else {
+          throw new Error('Failed to send alert');
+        }
+      } catch (error) {
+        console.error('Failed to send downtime alert:', error);
+        toast.error('Failed to send downtime alert email');
+      } finally {
+        setIsSendingAlert(false);
+      }
+    };
 
     // Check a single endpoint health
     const checkEndpointHealth = useCallback(async (endpoint: typeof endpoints[0]) => {
@@ -672,58 +719,89 @@ const MerchantAPI = () => {
         const responseTime = Date.now() - startTime;
         const isHealthy = responseTime < 5000; // Consider healthy if under 5 seconds
         
-        setEndpoints(prev => prev.map(ep => {
-          if (ep.id !== endpoint.id) return ep;
+        setEndpoints(prev => {
+          const updated = prev.map(ep => {
+            if (ep.id !== endpoint.id) return ep;
+            
+            const newHistory = [
+              { timestamp: new Date(), status: isHealthy ? "healthy" as const : "unhealthy" as const, responseTime },
+              ...ep.history.slice(0, 99) // Keep last 100 checks
+            ];
+            
+            // Calculate uptime from history
+            const healthyChecks = newHistory.filter(h => h.status === "healthy").length;
+            const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 100;
+            const newConsecutiveFailures = isHealthy ? 0 : ep.consecutiveFailures + 1;
+            
+            return {
+              ...ep,
+              status: isHealthy ? "healthy" as const : (uptime > 80 ? "degraded" as const : "unhealthy" as const),
+              lastChecked: new Date(),
+              responseTime,
+              uptime,
+              consecutiveFailures: newConsecutiveFailures,
+              alertSent: isHealthy ? false : ep.alertSent, // Reset alert flag when healthy
+              history: newHistory
+            };
+          });
           
-          const newHistory = [
-            { timestamp: new Date(), status: isHealthy ? "healthy" as const : "unhealthy" as const, responseTime },
-            ...ep.history.slice(0, 99) // Keep last 100 checks
-          ];
+          // Check if we need to send an alert
+          const updatedEndpoint = updated.find(ep => ep.id === endpoint.id);
+          if (updatedEndpoint && 
+              !updatedEndpoint.alertSent && 
+              updatedEndpoint.consecutiveFailures >= failureThreshold &&
+              emailAlertEnabled && 
+              alertEmail) {
+            sendDowntimeAlert(updatedEndpoint);
+          }
           
-          // Calculate uptime from history
-          const healthyChecks = newHistory.filter(h => h.status === "healthy").length;
-          const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 100;
-          
-          return {
-            ...ep,
-            status: isHealthy ? "healthy" as const : (uptime > 80 ? "degraded" as const : "unhealthy" as const),
-            lastChecked: new Date(),
-            responseTime,
-            uptime,
-            consecutiveFailures: isHealthy ? 0 : ep.consecutiveFailures + 1,
-            history: newHistory
-          };
-        }));
+          return updated;
+        });
 
         return { success: isHealthy, responseTime };
       } catch (error) {
         const responseTime = Date.now() - startTime;
         
-        setEndpoints(prev => prev.map(ep => {
-          if (ep.id !== endpoint.id) return ep;
+        setEndpoints(prev => {
+          const updated = prev.map(ep => {
+            if (ep.id !== endpoint.id) return ep;
+            
+            const newHistory = [
+              { timestamp: new Date(), status: "unhealthy" as const, responseTime },
+              ...ep.history.slice(0, 99)
+            ];
+            
+            const healthyChecks = newHistory.filter(h => h.status === "healthy").length;
+            const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 0;
+            const newConsecutiveFailures = ep.consecutiveFailures + 1;
+            
+            return {
+              ...ep,
+              status: uptime > 80 ? "degraded" as const : "unhealthy" as const,
+              lastChecked: new Date(),
+              responseTime,
+              uptime,
+              consecutiveFailures: newConsecutiveFailures,
+              history: newHistory
+            };
+          });
           
-          const newHistory = [
-            { timestamp: new Date(), status: "unhealthy" as const, responseTime },
-            ...ep.history.slice(0, 99)
-          ];
+          // Check if we need to send an alert
+          const updatedEndpoint = updated.find(ep => ep.id === endpoint.id);
+          if (updatedEndpoint && 
+              !updatedEndpoint.alertSent && 
+              updatedEndpoint.consecutiveFailures >= failureThreshold &&
+              emailAlertEnabled && 
+              alertEmail) {
+            sendDowntimeAlert(updatedEndpoint);
+          }
           
-          const healthyChecks = newHistory.filter(h => h.status === "healthy").length;
-          const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 0;
-          
-          return {
-            ...ep,
-            status: uptime > 80 ? "degraded" as const : "unhealthy" as const,
-            lastChecked: new Date(),
-            responseTime,
-            uptime,
-            consecutiveFailures: ep.consecutiveFailures + 1,
-            history: newHistory
-          };
-        }));
+          return updated;
+        });
 
         return { success: false, responseTime };
       }
-    }, [environment]);
+    }, [environment, emailAlertEnabled, alertEmail, failureThreshold]);
 
     // Check all endpoints
     const checkAllEndpoints = useCallback(async () => {
@@ -766,6 +844,7 @@ const MerchantAPI = () => {
         responseTime: null,
         uptime: 100,
         consecutiveFailures: 0,
+        alertSent: false,
         history: []
       };
 
@@ -1042,14 +1121,73 @@ const MerchantAPI = () => {
             </div>
           )}
 
+          {/* Email Alert Settings */}
+          <div className="p-4 bg-background/50 rounded-lg border space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-cyan-500" />
+                <Label htmlFor="email-alert" className="font-medium">Email Downtime Alerts</Label>
+              </div>
+              <Switch
+                id="email-alert"
+                checked={emailAlertEnabled}
+                onCheckedChange={setEmailAlertEnabled}
+              />
+            </div>
+            
+            {emailAlertEnabled && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="alert-email">Alert Email Address</Label>
+                  <Input
+                    id="alert-email"
+                    type="email"
+                    placeholder="alerts@yourcompany.com"
+                    value={alertEmail}
+                    onChange={(e) => setAlertEmail(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="failure-threshold">
+                    Alert After Consecutive Failures: {failureThreshold}
+                  </Label>
+                  <Input
+                    id="failure-threshold"
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={failureThreshold}
+                    onChange={(e) => setFailureThreshold(parseInt(e.target.value))}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Send an email alert when an endpoint fails {failureThreshold} times in a row
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Analytics Link */}
+          <Button
+            variant="outline"
+            className="w-full border-cyan-500/50 hover:bg-cyan-500/10"
+            onClick={() => navigate('/dashboard/merchant/webhook-analytics')}
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            View Webhook Analytics Dashboard
+          </Button>
+
           {/* Health Check Tips */}
           <div className="p-4 bg-muted/50 rounded-lg">
             <h4 className="font-medium text-sm mb-2">💡 Health Check Tips</h4>
             <ul className="text-xs text-muted-foreground space-y-1">
               <li>• Health checks use HEAD requests to minimize bandwidth</li>
               <li>• Response times under 500ms are considered optimal</li>
-              <li>• Endpoints are marked unhealthy after 3+ consecutive failures</li>
+              <li>• Endpoints are marked unhealthy after {failureThreshold}+ consecutive failures</li>
               <li>• Enable monitoring to receive automatic periodic health checks</li>
+              <li>• Enable email alerts to get notified when endpoints go down</li>
             </ul>
           </div>
         </CardContent>
