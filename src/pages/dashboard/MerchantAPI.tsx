@@ -19,6 +19,9 @@ import { useAccount } from "wagmi";
 import { RateLimitingVisualization } from "@/components/webhook/RateLimitingVisualization";
 import { WebhookSimulator } from "@/components/webhook/WebhookSimulator";
 import { WebhookPayloadTemplates } from "@/components/webhook/WebhookPayloadTemplates";
+import { WebhookRetryQueue } from "@/components/webhook/WebhookRetryQueue";
+import { WebhookPayloadValidator } from "@/components/webhook/WebhookPayloadValidator";
+import { EmbeddablePaymentWidget } from "@/components/merchant/EmbeddablePaymentWidget";
 import { useConnect } from "wagmi";
 
 const MerchantAPI = () => {
