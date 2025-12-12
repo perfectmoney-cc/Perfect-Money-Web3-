@@ -14,7 +14,7 @@ import { RevenueChart } from "@/components/merchant/RevenueChart";
 import { 
   ArrowLeft, Store, QrCode, Link as LinkIcon, ChevronLeft, ChevronRight, Eye, 
   Ticket, Users, TrendingUp, Zap, Shield, Globe, Smartphone, CreditCard, 
-  BarChart3, MessageSquare, Bell, Megaphone
+  BarChart3, MessageSquare, Bell, Megaphone, Settings
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -337,6 +337,15 @@ const MerchantPage = () => {
                 >
                   <Globe className="h-4 w-4 mr-1 lg:mr-2" />
                   API
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs lg:text-sm col-span-3 mt-2"
+                  onClick={() => navigate('/dashboard/merchant/admin')}
+                >
+                  <Settings className="h-4 w-4 mr-1 lg:mr-2" />
+                  Admin Panel
                 </Button>
               </div>
             </div>
