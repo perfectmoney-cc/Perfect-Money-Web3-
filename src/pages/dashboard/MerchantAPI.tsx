@@ -1708,6 +1708,15 @@ console.log(data.payment_url);`}
         {/* Webhook Payload Templates */}
         <WebhookPayloadTemplates />
 
+        {/* Webhook Retry Queue */}
+        <WebhookRetryQueue />
+
+        {/* Webhook Payload Validator */}
+        <WebhookPayloadValidator />
+
+        {/* Embeddable Payment Widget */}
+        <EmbeddablePaymentWidget merchantWallet={address || ""} />
+
         {/* Webhook Integration */}
         <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
           <CardHeader>
