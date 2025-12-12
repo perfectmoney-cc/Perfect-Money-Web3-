@@ -22,6 +22,7 @@ import { WebhookPayloadTemplates } from "@/components/webhook/WebhookPayloadTemp
 import { WebhookRetryQueue } from "@/components/webhook/WebhookRetryQueue";
 import { WebhookPayloadValidator } from "@/components/webhook/WebhookPayloadValidator";
 import { EmbeddablePaymentWidget } from "@/components/merchant/EmbeddablePaymentWidget";
+import NotificationPreferences from "@/components/merchant/NotificationPreferences";
 import { useConnect } from "wagmi";
 
 const MerchantAPI = () => {
@@ -1713,6 +1714,31 @@ console.log(data.payment_url);`}
 
         {/* Webhook Payload Validator */}
         <WebhookPayloadValidator />
+
+        {/* Notification Preferences */}
+        <NotificationPreferences />
+
+        {/* Webhook Analytics Link */}
+        <Card className="border-cyan-500/30 bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-cyan-500/20">
+                  <BarChart3 className="h-6 w-6 text-cyan-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Webhook Analytics Dashboard</h3>
+                  <p className="text-sm text-muted-foreground">
+                    View delivery success rates, response times, and event volumes
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => navigate('/dashboard/merchant/webhook-analytics')}>
+                View Analytics
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Embeddable Payment Widget */}
         <EmbeddablePaymentWidget merchantWallet={address || ""} />
