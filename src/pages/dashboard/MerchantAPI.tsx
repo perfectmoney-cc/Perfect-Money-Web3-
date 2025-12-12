@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2, Mail, BarChart3 } from "lucide-react";
+import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2, Mail, BarChart3, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { Footer } from "@/components/Footer";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useAccount } from "wagmi";
+import { RateLimitingVisualization } from "@/components/webhook/RateLimitingVisualization";
+import { WebhookSimulator } from "@/components/webhook/WebhookSimulator";
 
 const MerchantAPI = () => {
   const navigate = useNavigate();
@@ -639,6 +641,9 @@ const MerchantAPI = () => {
       uptime: number;
       consecutiveFailures: number;
       alertSent: boolean;
+      recoverySent: boolean;
+      wasDown: boolean;
+      downtimeStart: Date | null;
       history: Array<{
         timestamp: Date;
         status: "healthy" | "unhealthy";
@@ -656,6 +661,7 @@ const MerchantAPI = () => {
     const [alertEmail, setAlertEmail] = useState("");
     const [failureThreshold, setFailureThreshold] = useState(3);
     const [isSendingAlert, setIsSendingAlert] = useState(false);
+    const [recoveryAlertsEnabled, setRecoveryAlertsEnabled] = useState(true);
 
     // Send downtime alert email
     const sendDowntimeAlert = async (endpoint: typeof endpoints[0]) => {
@@ -696,6 +702,37 @@ const MerchantAPI = () => {
       }
     };
 
+    // Send recovery alert email
+    const sendRecoveryAlert = async (endpoint: typeof endpoints[0], downtimeStart: Date | null) => {
+      if (!emailAlertEnabled || !alertEmail || !recoveryAlertsEnabled) return;
+      
+      const downtimeDuration = downtimeStart 
+        ? Math.round((Date.now() - downtimeStart.getTime()) / 60000) 
+        : 0;
+      
+      try {
+        const response = await fetch('https://ihuqvxvcqnrdxphqxpqr.supabase.co/functions/v1/webhook-recovery-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchantEmail: alertEmail,
+            endpointName: endpoint.name,
+            endpointUrl: endpoint.url,
+            downtimeDuration,
+            currentUptime: endpoint.uptime,
+            responseTime: endpoint.responseTime || 0,
+            environment
+          })
+        });
+
+        if (response.ok) {
+          toast.success(`Recovery alert sent to ${alertEmail}`);
+        }
+      } catch (error) {
+        console.error('Failed to send recovery alert:', error);
+      }
+    };
+
     // Check a single endpoint health
     const checkEndpointHealth = useCallback(async (endpoint: typeof endpoints[0]) => {
       const startTime = Date.now();
@@ -733,6 +770,9 @@ const MerchantAPI = () => {
             const uptime = newHistory.length > 0 ? (healthyChecks / newHistory.length) * 100 : 100;
             const newConsecutiveFailures = isHealthy ? 0 : ep.consecutiveFailures + 1;
             
+            // Check if endpoint just recovered from being down
+            const justRecovered = isHealthy && ep.wasDown && !ep.recoverySent;
+            
             return {
               ...ep,
               status: isHealthy ? "healthy" as const : (uptime > 80 ? "degraded" as const : "unhealthy" as const),
@@ -741,18 +781,27 @@ const MerchantAPI = () => {
               uptime,
               consecutiveFailures: newConsecutiveFailures,
               alertSent: isHealthy ? false : ep.alertSent, // Reset alert flag when healthy
+              recoverySent: justRecovered ? true : (isHealthy ? false : ep.recoverySent),
+              wasDown: !isHealthy || (ep.wasDown && !isHealthy),
+              downtimeStart: !isHealthy && !ep.wasDown ? new Date() : (isHealthy ? null : ep.downtimeStart),
               history: newHistory
             };
           });
           
-          // Check if we need to send an alert
+          // Check if we need to send an alert or recovery notification
           const updatedEndpoint = updated.find(ep => ep.id === endpoint.id);
-          if (updatedEndpoint && 
-              !updatedEndpoint.alertSent && 
-              updatedEndpoint.consecutiveFailures >= failureThreshold &&
-              emailAlertEnabled && 
-              alertEmail) {
-            sendDowntimeAlert(updatedEndpoint);
+          const originalEndpoint = prev.find(ep => ep.id === endpoint.id);
+          
+          if (updatedEndpoint && emailAlertEnabled && alertEmail) {
+            // Send downtime alert
+            if (!updatedEndpoint.alertSent && 
+                updatedEndpoint.consecutiveFailures >= failureThreshold) {
+              sendDowntimeAlert(updatedEndpoint);
+            }
+            // Send recovery alert
+            if (isHealthy && originalEndpoint?.wasDown && !originalEndpoint?.recoverySent && recoveryAlertsEnabled) {
+              sendRecoveryAlert(updatedEndpoint, originalEndpoint.downtimeStart);
+            }
           }
           
           return updated;
@@ -766,6 +815,7 @@ const MerchantAPI = () => {
           const updated = prev.map(ep => {
             if (ep.id !== endpoint.id) return ep;
             
+            const wasAlreadyDown = ep.wasDown;
             const newHistory = [
               { timestamp: new Date(), status: "unhealthy" as const, responseTime },
               ...ep.history.slice(0, 99)
@@ -782,6 +832,8 @@ const MerchantAPI = () => {
               responseTime,
               uptime,
               consecutiveFailures: newConsecutiveFailures,
+              wasDown: true,
+              downtimeStart: !wasAlreadyDown ? new Date() : ep.downtimeStart,
               history: newHistory
             };
           });
@@ -801,7 +853,7 @@ const MerchantAPI = () => {
 
         return { success: false, responseTime };
       }
-    }, [environment, emailAlertEnabled, alertEmail, failureThreshold]);
+    }, [environment, emailAlertEnabled, alertEmail, failureThreshold, recoveryAlertsEnabled]);
 
     // Check all endpoints
     const checkAllEndpoints = useCallback(async () => {
@@ -840,12 +892,15 @@ const MerchantAPI = () => {
         url: newEndpointUrl,
         name: newEndpointName || new URL(newEndpointUrl).hostname,
         status: "unknown" as const,
-        lastChecked: null,
-        responseTime: null,
+        lastChecked: null as Date | null,
+        responseTime: null as number | null,
         uptime: 100,
         consecutiveFailures: 0,
         alertSent: false,
-        history: []
+        recoverySent: false,
+        wasDown: false,
+        downtimeStart: null as Date | null,
+        history: [] as Array<{ timestamp: Date; status: "healthy" | "unhealthy"; responseTime: number }>
       };
 
       setEndpoints(prev => [...prev, newEndpoint]);
@@ -1553,6 +1608,12 @@ console.log(data.payment_url);`}
 
         {/* Webhook Health Check */}
         <WebhookHealthCheck environment={environment} />
+
+        {/* Rate Limiting Visualization */}
+        <RateLimitingVisualization />
+
+        {/* Webhook Simulator */}
+        <WebhookSimulator environment={environment} />
 
         {/* Webhook Integration */}
         <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5">

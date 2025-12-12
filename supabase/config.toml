@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.webhook-downtime-alert]
 verify_jwt = false
+
+[functions.webhook-recovery-alert]
+verify_jwt = false
