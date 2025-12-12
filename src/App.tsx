@@ -68,6 +68,7 @@ import StorePage from "./pages/dashboard/Store";
 import OrderHistoryPage from "./pages/dashboard/OrderHistory";
 import StoreAdminPage from "./pages/dashboard/StoreAdmin";
 import MerchantAPIPage from "./pages/dashboard/MerchantAPI";
+import MerchantAdminPage from "./pages/dashboard/MerchantAdmin";
 import WebhookLogsPage from "./pages/dashboard/WebhookLogs";
 import WebhookAnalyticsPage from "./pages/dashboard/WebhookAnalytics";
 import NotFound from "./pages/NotFound";
@@ -134,6 +135,7 @@ const App = () => (
               <Route path="/dashboard/store/orders" element={<OrderHistoryPage />} />
               <Route path="/dashboard/store/admin" element={<StoreAdminPage />} />
               <Route path="/dashboard/merchant/api" element={<MerchantAPIPage />} />
+              <Route path="/dashboard/merchant/admin" element={<MerchantAdminPage />} />
               <Route path="/dashboard/merchant/webhook-logs" element={<WebhookLogsPage />} />
               <Route path="/dashboard/merchant/webhook-analytics" element={<WebhookAnalyticsPage />} />
               <Route path="/roadmap" element={<Roadmap />} />
