@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2, Mail, BarChart3, Bell } from "lucide-react";
+import { ArrowLeft, Code, Copy, Check, Globe, TestTube, Zap, Key, RefreshCw, ExternalLink, Shield, Lock, Send, Loader2, CheckCircle, XCircle, History, AlertTriangle, Activity, Wifi, WifiOff, Clock, Play, Pause, Trash2, Mail, BarChart3, Bell, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { useAccount } from "wagmi";
 import { RateLimitingVisualization } from "@/components/webhook/RateLimitingVisualization";
 import { WebhookSimulator } from "@/components/webhook/WebhookSimulator";
+import { WebhookPayloadTemplates } from "@/components/webhook/WebhookPayloadTemplates";
+import { useConnect } from "wagmi";
 
 const MerchantAPI = () => {
   const navigate = useNavigate();
@@ -631,6 +633,7 @@ const MerchantAPI = () => {
     environment: "sandbox" | "production";
   }) => {
     const navigate = useNavigate();
+    const { connectors, connect } = useConnect();
     const [endpoints, setEndpoints] = useState<Array<{
       id: string;
       url: string;
@@ -662,6 +665,63 @@ const MerchantAPI = () => {
     const [failureThreshold, setFailureThreshold] = useState(3);
     const [isSendingAlert, setIsSendingAlert] = useState(false);
     const [recoveryAlertsEnabled, setRecoveryAlertsEnabled] = useState(true);
+
+    // Export health history to CSV
+    const exportHealthHistoryCSV = () => {
+      if (endpoints.length === 0) {
+        toast.error("No endpoints to export");
+        return;
+      }
+
+      const headers = ["Endpoint Name", "URL", "Timestamp", "Status", "Response Time (ms)", "Uptime (%)"];
+      const rows: string[][] = [];
+
+      endpoints.forEach(endpoint => {
+        endpoint.history.forEach(h => {
+          rows.push([
+            endpoint.name,
+            endpoint.url,
+            h.timestamp.toISOString(),
+            h.status,
+            h.responseTime.toString(),
+            endpoint.uptime.toFixed(2)
+          ]);
+        });
+      });
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `webhook-health-history-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Health history exported to CSV!");
+    };
+
+    // Auto-connect wallet on successful payment
+    const autoConnectWalletOnPayment = useCallback(async (paymentCurrency: string) => {
+      if (isConnected) return;
+      
+      const supportedCurrencies = ["USDT-BEP20", "USDC-BEP20", "PM-BEP20"];
+      if (!supportedCurrencies.includes(paymentCurrency)) return;
+
+      // Try to connect with the first available connector (usually MetaMask)
+      const connector = connectors.find(c => c.ready);
+      if (connector) {
+        try {
+          await connect({ connector });
+          toast.success(`Wallet connected after ${paymentCurrency} payment!`);
+        } catch (error) {
+          console.error("Auto-connect failed:", error);
+        }
+      }
+    }, [isConnected, connectors, connect]);
 
     // Send downtime alert email
     const sendDowntimeAlert = async (endpoint: typeof endpoints[0]) => {
@@ -1030,6 +1090,15 @@ const MerchantAPI = () => {
                   <RefreshCw className={`h-4 w-4 mr-2 ${endpoints.some(ep => ep.status === "checking") ? "animate-spin" : ""}`} />
                   Check Now
                 </Button>
+                <Button
+                  onClick={exportHealthHistoryCSV}
+                  variant="outline"
+                  size="sm"
+                  disabled={endpoints.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
               </div>
               
               <div className="flex items-center gap-2 ml-auto">
@@ -1219,6 +1288,24 @@ const MerchantAPI = () => {
                   <p className="text-xs text-muted-foreground">
                     Send an email alert when an endpoint fails {failureThreshold} times in a row
                   </p>
+                </div>
+
+                {/* Recovery Alerts Toggle */}
+                <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-green-500" />
+                    <div>
+                      <Label htmlFor="recovery-alerts" className="font-medium text-green-500">Recovery Alerts</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Get notified when a down endpoint comes back online
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="recovery-alerts"
+                    checked={recoveryAlertsEnabled}
+                    onCheckedChange={setRecoveryAlertsEnabled}
+                  />
                 </div>
               </div>
             )}
@@ -1614,6 +1701,9 @@ console.log(data.payment_url);`}
 
         {/* Webhook Simulator */}
         <WebhookSimulator environment={environment} />
+
+        {/* Webhook Payload Templates */}
+        <WebhookPayloadTemplates />
 
         {/* Webhook Integration */}
         <Card className="border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
