@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Activity, Clock, Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChart3, LineChart, PieChart, Calendar, Download, RefreshCw, Radio, Shield } from "lucide-react";
 import { RealtimeEventStream } from "@/components/webhook/RealtimeEventStream";
 import { SignatureVerifier } from "@/components/webhook/SignatureVerifier";
+import { EndpointHealthMonitor } from "@/components/webhook/EndpointHealthMonitor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -584,6 +585,9 @@ const WebhookAnalytics = () => {
 
         {/* Real-time Event Stream */}
         <RealtimeEventStream />
+
+        {/* Endpoint Health Monitor */}
+        <EndpointHealthMonitor />
 
         {/* Signature Verification Tool */}
         <SignatureVerifier />
