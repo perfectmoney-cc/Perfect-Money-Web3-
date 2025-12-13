@@ -12,6 +12,7 @@ import { MerchantSubscriptionModal } from "@/components/MerchantSubscriptionModa
 import { WalletCard } from "@/components/WalletCard";
 import { RevenueChart } from "@/components/merchant/RevenueChart";
 import { DashboardCustomizer } from "@/components/merchant/DashboardCustomizer";
+import { RevenueForecast } from "@/components/merchant/RevenueForecast";
 import { 
   ArrowLeft, Store, QrCode, Link as LinkIcon, ChevronLeft, ChevronRight, Eye, 
   Ticket, Users, TrendingUp, Zap, Shield, Globe, Smartphone, CreditCard, 
@@ -250,6 +251,11 @@ const MerchantPage = () => {
           {/* Revenue Chart */}
           <div className="mb-6">
             <RevenueChart />
+          </div>
+
+          {/* Revenue Forecast */}
+          <div className="mb-6">
+            <RevenueForecast />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
