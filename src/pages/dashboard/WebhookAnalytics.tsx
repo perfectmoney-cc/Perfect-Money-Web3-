@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Activity, Clock, Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChart3, LineChart, PieChart, Calendar, Download, RefreshCw } from "lucide-react";
+import { ArrowLeft, Activity, Clock, Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, BarChart3, LineChart, PieChart, Calendar, Download, RefreshCw, Radio, Shield } from "lucide-react";
+import { RealtimeEventStream } from "@/components/webhook/RealtimeEventStream";
+import { SignatureVerifier } from "@/components/webhook/SignatureVerifier";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -579,6 +581,12 @@ const WebhookAnalytics = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Real-time Event Stream */}
+        <RealtimeEventStream />
+
+        {/* Signature Verification Tool */}
+        <SignatureVerifier />
       </main>
       <Footer />
       <MobileBottomNav />

@@ -11,6 +11,7 @@ import { Footer } from "@/components/Footer";
 import { MerchantSubscriptionModal } from "@/components/MerchantSubscriptionModal";
 import { WalletCard } from "@/components/WalletCard";
 import { RevenueChart } from "@/components/merchant/RevenueChart";
+import { DashboardCustomizer } from "@/components/merchant/DashboardCustomizer";
 import { 
   ArrowLeft, Store, QrCode, Link as LinkIcon, ChevronLeft, ChevronRight, Eye, 
   Ticket, Users, TrendingUp, Zap, Shield, Globe, Smartphone, CreditCard, 
@@ -558,6 +559,9 @@ const MerchantPage = () => {
               </>
             )}
           </Card>
+
+          {/* Dashboard Customizer */}
+          <DashboardCustomizer />
         </div>
       </main>
 
